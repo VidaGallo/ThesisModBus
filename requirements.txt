@@ -1,2 +1,8 @@
 numpy
 cplex
+json
+pathlib
+networkx
+random
+math
+

@@ -32,12 +32,13 @@ ThesisModBus/
 │   │   ├── solve_cplex_deterministic.py 
 │   │   └── solve_cplex_stochastic.py
 │   │
-│   ├── data_generation/
-│   │   ├── generate_network.py   # graph construction → grid_network.json, city_network.json
-│   │   └── generate_demands.py   # simulator → taxi-like_requests.json, bus-like_requests.json
+│   ├── data_generation/           # REMARK: continuous time
+│   │   ├── generate_network.py    # graph construction → grid_network.json, city_network.json
+│   │   ├── generate_bus_lines.py  # line construction
+│   │   └── generate_demands.py    # simulator  → taxi-like_requests.json, bus-like_requests.json
 │   │
 │   ├── utils/
-│   │   ├── loaders.py
+│   │   ├── loaders.py    # includes discretizations
 │   │   ├── time_expansion.py
 │   │   ├── solver_utils.py
 │   │   └── visualization.py
