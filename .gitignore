@@ -1,3 +1,46 @@
-.venv/
+# -------------------------
+# Python / Environments
+# -------------------------
+.venv*
+venv/
+.env
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# -------------------------
+# Solver files (Gurobi / CPLEX)
+# -------------------------
+*.log
+*.prm
+*.bas
+*.mst
+*.sol
+*.sav
+*.lp
+*.hlp
+
+# -------------------------
+# Results
+# -------------------------
+results/*
+!results/.gitkeep
+
+# -------------------------
+# Instances processed (heavy files)
+# -------------------------
+instances/formatted/*
+!instances/formatted/.gitkeep
+
+# -------------------------
+# VS Code
+# -------------------------
 .vscode/
+.settings/
+
+# -------------------------
+# OS files
+# -------------------------
+.DS_Store
+Thumbs.db
