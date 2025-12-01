@@ -6,4 +6,5 @@ networkx
 random
 math
 dataclasses
+typing
 

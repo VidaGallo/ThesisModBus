@@ -1,63 +1,43 @@
 
-from utils import loader
-
-
-
+from utils.loader import *
 
 
 
 if __name__ == "__main__":
-    # Example usage for GRID 5x5 with 3 modules:
-    network_path = "instances/GRID/5x5/network_disc5min.json"
-    requests_path = "instances/GRID/5x5/taxi_like_requests_100maxmin_disc5min.json"
-
-    ### --- Costs ---
-    C_KM = 1
-    C_SECOND = 1
-
-    ### --- Number of modules max |M| ---
-    NUM_MODULES = 3
-    CAP_MODULES = 10
-    print("*" * 50)
-    print("MODULES:")
-    print("-n° of modules =", NUM_MODULES)
-    print("cap. of modules =", CAP_MODULES)
-    print("\n")
+    
+    ### Parameters 
+    dt = 5              # minutes per slot
+    t_max = 100 // dt   # e.g., time horizon 100 minutes → 20 slots
+    num_modules = 3
+    Q = 10
+    c_km = 1.0
+    c_uns_taxi = 1     # ???
 
 
+    # --- File paths (already existing and discretized) ---
+    base = "instances/GRID/5x5"    # Folder with the current Data
+    network_path = f"{base}/network_disc{dt}min.json"
+    requests_path = f"{base}/taxi_like_requests_100maxmin_disc{dt}min.json"
 
-    ### --- Max Time Horizon t_max ---
-    filename = requests_path.split("/")[-1]       # take only the file part
-    parts = filename.split("_")
-    Tmax_min_str = parts[3]             # "***maxmin"
-    disc_str = parts[4]                 # "disc***min.json"
-
-    Tmax_min = int(Tmax_min_str.replace("maxmin", ""))
-    dt = int(disc_str.replace("disc", "").replace("min.json", ""))
-    t_max = Tmax_min // dt
-    print("*" * 50)
-    print("TIME HORIZON and DISCRETIZATION:")
-    print("-Tmax_min =", Tmax_min)
-    print("-dt =", dt)
-    print("-t_max =", t_max)
-    print("\n")
+    print("Fino a qui vaaaaaa")
 
 
-
-
-    ###
-    data = build_cplex_instance(
+    # --- Load instance ---
+    instance = load_instance_discrete(
         network_path=network_path,
         requests_path=requests_path,
+        dt=dt,
+        t_max=t_max,
         num_modules=num_modules,
+        Q=Q,
+        c_km=c_km,
+        c_uns_taxi=c_uns_taxi
     )
 
-    print("[INFO] Instance built:")
-    print(f"  |N| = {len(data['N'])}")
-    print(f"  |A| = {len(data['A'])}")
-    print(f"  |K| = {len(data['K'])}")
-    print(f"  |T| = {len(data['T'])}")
-    print(f"  |M| = {len(data['M'])}")
-    print(f"  Number of d entries      = {len(data['d'])}")
-    print(f"  Number of d_tilde entries= {len(data['d_tilde'])}")
-
+    # --- Quick validation ---
+    print("[INFO] Instance loaded:")
+    print(f"  |N| = {instance.num_nodes}")
+    print(f"  |A| = {len(instance.A)}")
+    print(f"  |K| = {instance.num_requests}")
+    print(f"  |M| = {instance.num_modules}")
+    print(f"  |T| = {len(instance.T)}")

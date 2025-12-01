@@ -32,51 +32,172 @@ All time indices start from t = 1.
 
 
 
-from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional, Any
-from pathlib import Path
 import json
 import math
+from pathlib import Path
+from typing import Tuple, Dict, List, Set
+
+from instance import *
 
 
 
 
-#################
-# INSTANCE CLASS:
-#################
- 
-@dataclass
-class Instance:
-    # set
-    N: List[int]
-    A: List[Tuple[int, int]]
-    T: List[int]
-    K: List[int]
-    M: List[int]
+##### Network with already discretized travel times 
+def load_discrete_network(network_path: str):
+    """
+    Load a DISCRETE network JSON (already discretized via time_discretization).
 
-    # parameters
-    q: Dict[int, float]
-    gamma: Dict[Tuple[int, int], float]
-    tau: Dict[Tuple[int, int], int]
+    Expected edge attributes:
+        - length_km
+        - time_steps   (integer discrete travel time)
+    """
+    path = Path(network_path)
+    with path.open("r", encoding="utf-8") as f:
+        net = json.load(f)
 
-    DeltaT: Dict[int, List[int]]
-    DeltaT_in: Dict[int, List[int]]
-    DeltaT_out: Dict[int, List[int]]
+    N: Set[Node] = set()
+    A: Set[Arc] = set()
+    gamma: Dict[Arc, float] = {}
+    tau_arc: Dict[Arc, int] = {}
 
-    d_in: Dict[Tuple[int, int, int], int]
-    d_out: Dict[Tuple[int, int, int], int]
+    # Nodes
+    for node in net["nodes"]:
+        N.add(int(node["id"]))
 
-    origin: Dict[int, int]
-    destination: Dict[int, int]
+    # Edges
+    for e in net["edges"]:
+        i = int(e["u"])
+        j = int(e["v"])
+        arc = (i, j)
 
-    t_max: int
-    Tmax_min: int       # orizzonte continuo (minuti)
-    dt: int             # discretizzazione (minuti)
-    time_step_min: Optional[float]
+        A.add(arc)
+        gamma[arc] = float(e["length_km"])
+        tau_arc[arc] = int(e["time_steps"])  # already discrete!
 
-    # costi (se vuoi passarli)
-    C_KM: Optional[float] = None
-    C_SECOND: Optional[float] = None
+    return N, A, gamma, tau_arc
 
 
 
+##### Requests already discretized
+def load_discrete_requests(requests_path: str, t_max: int):
+    """
+    Load DISCRETE taxi-like requests where each request already contains:
+        - T_k_idx
+        - T_in_idx
+        - T_out_idx
+    """
+    path = Path(requests_path)
+    with path.open("r", encoding="utf-8") as f:
+        reqs = json.load(f)
+
+    K: Set[Request] = set()
+    q: Dict[Request, int] = {}
+    origin: Dict[Request, Node] = {}
+    dest: Dict[Request, Node] = {}
+    DeltaT: Dict[Request, List[Time]] = {}
+    DeltaT_in: Dict[Request, List[Time]] = {}
+    DeltaT_out: Dict[Request, List[Time]] = {}
+
+    d_in: Dict[Tuple[Request, Node, Time], int] = {}
+    d_out: Dict[Tuple[Request, Node, Time], int] = {}
+
+    for r in reqs:
+        k = int(r["id"])
+        K.add(k)
+
+        origin[k] = int(r["origin"])
+        dest[k] = int(r["destination"])
+        q[k] = int(r["q_k"])
+
+        # already discrete
+        DeltaT[k] = r["T_k_idx"]
+        DeltaT_in[k] = r["T_in_idx"]
+        DeltaT_out[k] = r["T_out_idx"]
+
+        # Build sparse d_in and d_out
+        i_orig = origin[k]
+        i_dest = dest[k]
+
+        for t in DeltaT_in[k]:
+            if 1 <= t <= t_max:
+                d_in[(k, i_orig, t)] = 1
+
+        for t in DeltaT_out[k]:
+            if 1 <= t <= t_max:
+                d_out[(k, i_dest, t)] = 1
+
+    return K, q, origin, dest, DeltaT, DeltaT_in, DeltaT_out, d_in, d_out
+
+
+
+
+
+
+
+##### Creation of the Instance Class with attributes inside
+def load_instance_discrete(
+    network_path: str,    
+    requests_path: str,   
+    dt: int,
+    t_max: int,
+    num_modules: int,
+    Q: int,
+    c_km: float,
+    c_uns_taxi: float,
+) -> Instance:
+    
+    """
+    Build an Instance using already-discrete files.
+
+    Parameters
+    ----------
+    network_path : str   # path to the .json
+    requests_path : str  # path to the .json
+    dt : int             # discretization step (already used)
+    t_max : int          # number of time slots
+    num_modules : int    # fleet size
+    Q : int              # module capacity
+    c_km : float         # cost per km
+    c_uns_taxi : float   # unserved demand penalty
+    """
+
+    ### Discrete network
+    N, A, gamma, tau_arc = load_discrete_network(network_path)
+
+    ### Time set
+    T = list(range(1, t_max + 1))     # {1,2,...,t_max}
+
+    ### Modules
+    M = set(range(1, num_modules + 1))    # {1,2,...,|M|}
+
+    ### Discrete taxi-like requests
+    (
+        K, q, origin, dest,
+        DeltaT, DeltaT_in, DeltaT_out,
+        d_in, d_out
+    ) = load_discrete_requests(requests_path, t_max)
+
+
+    ### Build Class Instance
+    return Instance(
+        N=N,
+        A=A,
+        M=M,
+        K=K,
+        T=T,
+        Q=Q,
+        c_km=c_km,
+        c_uns_taxi=c_uns_taxi,
+        gamma=gamma,
+        tau_arc=tau_arc,
+        q=q,
+        origin=origin,
+        dest=dest,
+        DeltaT=DeltaT,
+        DeltaT_in=DeltaT_in,
+        DeltaT_out=DeltaT_out,
+        d_in=d_in,
+        d_out=d_out,
+        dt=dt,
+        t_max=t_max,
+    )
