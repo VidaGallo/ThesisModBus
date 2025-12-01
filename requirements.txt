@@ -5,4 +5,5 @@ pathlib
 networkx
 random
 math
+dataclasses
 

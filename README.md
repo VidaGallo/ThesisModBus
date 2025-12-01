@@ -38,7 +38,8 @@ ThesisModBus/
 │   │   └── generate_demands.py    # simulator  → taxi-like_requests.json, bus-like_requests.json
 │   │
 │   ├── utils/
-│   │   ├── loaders.py    # includes discretizations
+│   │   ├── time_discretization.py   
+│   │   ├── loaders.py  
 │   │   ├── time_expansion.py
 │   │   ├── solver_utils.py
 │   │   └── visualization.py

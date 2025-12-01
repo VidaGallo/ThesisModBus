@@ -203,6 +203,9 @@ def save_requests(path: str, requests: list) -> None:
 
 
 
+
+
+
 if __name__ == "__main__":
 
     network_path = "instances/GRID/5x5/network.json"   # Path to an already generated network
@@ -228,6 +231,6 @@ if __name__ == "__main__":
     )
 
     # Save in the same directory
-    output_path = "instances/GRID/5x5/taxi_like_requests.json"
+    output_path = f"instances/GRID/5x5/taxi_like_requests_{int(time_horizon_max)}maxmin.json"
     save_requests(output_path, taxi_requests)
 
