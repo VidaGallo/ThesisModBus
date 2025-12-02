@@ -60,6 +60,15 @@ if __name__ == "__main__":
     ### Model solution
     solution = model.solve(log_output=True)
 
+    print("-"*77)
+    if solution:
+        print("Status:", solution.solve_status)
+        print("Objective:", solution.objective_value)
+    else:
+        print("No solution found.")
+    print("-"*77)
+
+
     ### Creation of the output folder
     output_folder = build_output_folder(
         base_dir="results",
@@ -68,18 +77,13 @@ if __name__ == "__main__":
         dt=instance.dt,
     )
 
+
     ### Save logs, stats, summary
     save_model_stats(model, output_folder)
 
-
-
     if solution is None:
-        print("[WARN] No solution found.")
-        # still write the log (infeasible case)
         save_cplex_log(model, output_folder)
     else:
-        print("[INFO] Objective value:", solution.objective_value)
-
         save_cplex_log(model, output_folder)
         save_solution_summary(solution, output_folder)
 

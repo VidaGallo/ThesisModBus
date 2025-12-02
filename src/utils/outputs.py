@@ -30,13 +30,13 @@ def build_output_folder(base_dir: str, network_path: str, t_max: int, dt: int):
 
     net = Path(network_path)
 
-    # extract GRID/5x5 from path
-    network_dir = net.parent.name      # "5x5"
-    network_group = net.parent.parent.name   # "GRID"
+    # ex.extract GRID/5x5 from path
+    network_dir = net.parent.name      # ex."5x5"
+    network_group = net.parent.parent.name   # ex."GRID"
 
     folder = Path(base_dir) / network_group / network_dir / f"tmax{t_max}_dt{dt}"
     folder.mkdir(parents=True, exist_ok=True)
-    
+
     return folder
 
 
@@ -45,14 +45,18 @@ def build_output_folder(base_dir: str, network_path: str, t_max: int, dt: int):
 
 def save_cplex_log(mdl: Model, output_folder: Path):
     """
-    Save CPLEX log to a text file.
+    Save CPLEX log and LP model file in the given folder.
     """
+    # path del file .lp come stringa
+    lp_path = output_folder / "model.lp"
+    mdl.export_as_lp(str(lp_path))
+
     log_path = output_folder / "cplex_log.txt"
     with log_path.open("w") as f:
-        mdl.export_as_lp(output_folder / "model.lp")
-        # Write solve details
         f.write("==== CPLEX SOLVE LOG ====\n")
         f.write(str(mdl.solve_details))
+
+    print(f"[INFO] CPLEX model exported to: {lp_path}")
     print(f"[INFO] CPLEX log saved to: {log_path}")
 
 
