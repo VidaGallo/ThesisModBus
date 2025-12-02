@@ -1,7 +1,8 @@
 from utils.loader import *
 from utils.instance import *
 from utils.print_data import *
-
+from models.deterministic.model_taxi_like import *
+from docplex.mp.model import Model
 
 FLAG_VERBOSE = 1  # 1 for displaying everything, 0 for displaying nothing
 
@@ -37,3 +38,11 @@ if __name__ == "__main__":
     if FLAG_VERBOSE:
         ### Check
         print_instance_summary(instance)
+
+
+
+    ### Model construction
+    mdl = Model(name="taxi_like")
+
+    add_taxi_like_constraints(model, I, x, y, r, w, s)
+    add_taxi_like_objective(model, I, y, s)
