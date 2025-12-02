@@ -8,4 +8,5 @@ math
 dataclasses
 typing
 docplex
+matplotlib
 

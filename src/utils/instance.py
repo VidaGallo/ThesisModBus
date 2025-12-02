@@ -67,6 +67,10 @@ class Instance:
     t_max: int = 0           # time horizon in number of discrete periods
 
 
+    ### --- depot ---
+    depot: int = 0
+
+    
     @property  # attribute "read-only"
     def num_nodes(self) -> int:
         return len(self.N)

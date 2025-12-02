@@ -208,17 +208,19 @@ def save_requests(path: str, requests: list) -> None:
 
 if __name__ == "__main__":
 
-    network_path = "instances/GRID/5x5/network.json"   # Path to an already generated network
+    network_path = "instances/GRID/3x3/network.json"   # Path to an already generated network
 
     G = load_network_as_graph(network_path)  
 
 
     # Parameters:
-    num_requests = 5
+    num_requests = 50
     q_min = 1
     q_max = 3
-    slack_min = 10.0          # in minutes
-    time_horizon_max = 100.0  # in minutes (es. 10h)
+    slack_min = 10         # in minutes
+
+    time_horizon_max = 60  # in minutes
+    number = 3 # side of the grid
 
     # Generation of requests
     taxi_requests = generate_taxi_requests(
@@ -231,6 +233,6 @@ if __name__ == "__main__":
     )
 
     # Save in the same directory
-    output_path = f"instances/GRID/5x5/taxi_like_requests_{int(time_horizon_max)}maxmin.json"
+    output_path = f"instances/GRID/{number}x{number}/taxi_like_requests_{int(time_horizon_max)}maxmin.json"
     save_requests(output_path, taxi_requests)
 

@@ -136,10 +136,12 @@ def discretize_network_travel_times(
 if __name__ == "__main__":
 
     time_step_min = 5.0
+    number = 3      # side of the grid
+    horizon = 60   # in minutes
 
     # 1) Discretization of the request
-    input_req = "instances/GRID/5x5/taxi_like_requests_100maxmin.json"
-    output_req = f"instances/GRID/5x5/taxi_like_requests_100maxmin_disc{int(time_step_min)}min.json"
+    input_req = f"instances/GRID/{number}x{number}/taxi_like_requests_{horizon}maxmin.json"
+    output_req = f"instances/GRID/{number}x{number}/taxi_like_requests_{horizon}maxmin_disc{int(time_step_min)}min.json"
 
     discretize_taxi_requests(
         input_path=input_req,
@@ -148,8 +150,8 @@ if __name__ == "__main__":
     )
 
     # 2) Discretization of the network
-    input_net = "instances/GRID/5x5/network.json"
-    output_net = f"instances/GRID/5x5/network_disc{int(time_step_min)}min.json"
+    input_net = f"instances/GRID/{number}x{number}/network.json"
+    output_net = f"instances/GRID/{number}x{number}/network_disc{int(time_step_min)}min.json"
 
     discretize_network_travel_times(
         input_path=input_net,

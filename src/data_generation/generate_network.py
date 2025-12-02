@@ -187,7 +187,7 @@ def save_network_json(network_dict: dict, output_dir: str, filename: str = "netw
 
 
 if __name__ == "__main__":
-    side = 5                # grid side dimension
+    side = 3                # grid side dimension
     edge_length_km = 1.0    
     speed_kmh = 40.0        
 

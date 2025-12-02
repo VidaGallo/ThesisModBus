@@ -34,7 +34,7 @@ def build_output_folder(base_dir: str, network_path: str, t_max: int, dt: int):
     network_dir = net.parent.name      # ex."5x5"
     network_group = net.parent.parent.name   # ex."GRID"
 
-    folder = Path(base_dir) / network_group / network_dir / f"tmax{t_max}_dt{dt}"
+    folder = Path(base_dir) / network_group / network_dir / f"tmax{t_max*dt}_dt{dt}"
     folder.mkdir(parents=True, exist_ok=True)
 
     return folder

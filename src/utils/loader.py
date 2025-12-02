@@ -26,6 +26,7 @@ This module constructs:
         - Tout[k]      : list of indices ΔT_k^{out}
         - d_in[k,i,t]  : 1 if request k can board at node i at time t
         - d_out[k,i,t] : 1 if request k can alight at node i at time t
+        - depot        : node
 
 All time indices start from t = 1.
 """
@@ -33,7 +34,6 @@ All time indices start from t = 1.
 
 
 import json
-import math
 from pathlib import Path
 from typing import Tuple, Dict, List, Set
 
@@ -144,6 +144,7 @@ def load_instance_discrete(
     Q: int,
     c_km: float,
     c_uns_taxi: float,
+    depot: int
 ) -> Instance:
     
     """
@@ -159,6 +160,7 @@ def load_instance_discrete(
     Q : int              # module capacity
     c_km : float         # cost per km
     c_uns_taxi : float   # unserved demand penalty
+    depot: int           # depot node
     """
 
     ### Discrete network
@@ -198,6 +200,7 @@ def load_instance_discrete(
         DeltaT_out=DeltaT_out,
         d_in=d_in,
         d_out=d_out,
+        depot=depot,
         dt=dt,
         t_max=t_max,
     )
