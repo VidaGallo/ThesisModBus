@@ -37,7 +37,7 @@ import math
 from pathlib import Path
 from typing import Tuple, Dict, List, Set
 
-from instance import *
+from .instance import *
 
 
 
