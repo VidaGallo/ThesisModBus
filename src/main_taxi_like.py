@@ -2,9 +2,17 @@ from utils.loader import *
 from utils.instance import *
 from utils.print_data import *
 from models.deterministic.model_taxi_like import *
-from docplex.mp.model import Model
+from utils.cplex_config import *
+from utils.outputs import *
+
+
+
+
 
 FLAG_VERBOSE = 1  # 1 for displaying everything, 0 for displaying nothing
+
+
+
 
 
 if __name__ == "__main__":
@@ -42,7 +50,37 @@ if __name__ == "__main__":
 
 
     ### Model construction
-    mdl = Model(name="taxi_like")
+    model, x, y, r, w, s = create_taxi_like_model(instance)
 
-    add_taxi_like_constraints(model, I, x, y, r, w, s)
-    add_taxi_like_objective(model, I, y, s)
+
+    ### Model configuration
+    configure_cplex(model)
+
+
+    ### Model solution
+    solution = model.solve(log_output=True)
+
+    ### Creation of the output folder
+    output_folder = build_output_folder(
+        base_dir="results",
+        network_path=network_path,
+        t_max=instance.t_max,
+        dt=instance.dt,
+    )
+
+    ### Save logs, stats, summary
+    save_model_stats(model, output_folder)
+
+
+
+    if solution is None:
+        print("[WARN] No solution found.")
+        # still write the log (infeasible case)
+        save_cplex_log(model, output_folder)
+    else:
+        print("[INFO] Objective value:", solution.objective_value)
+
+        save_cplex_log(model, output_folder)
+        save_solution_summary(solution, output_folder)
+
+

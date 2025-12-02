@@ -18,21 +18,57 @@ from utils.instance import Instance
 
 
 
+def create_decision_variables(mdl: Model, I: Instance):
+    """
+    Create all MILP decision variables for the taxi-like model.
+    """
+
+    # x[m,i,t]
+    x = mdl.binary_var_dict(
+        keys=[(m, i, t) for m in I.M for i in I.N for t in I.T],
+        name="x"
+    )
+
+    # y[m,i,j,t]
+    y = mdl.binary_var_dict(
+        keys=[(m, i, j, t) for m in I.M for (i, j) in I.A for t in I.T],
+        name="y"
+    )
+
+    # r[k,t,m]
+    r = mdl.binary_var_dict(
+        keys=[(k, t, m) for k in I.K for t in I.T for m in I.M],
+        name="r"
+    )
+
+    # w[k,i,t,m,mp]
+    w = mdl.binary_var_dict(
+        keys=[
+            (k, i, t, m, mp)
+            for k in I.K
+            for i in I.N
+            for t in I.T
+            for m in I.M
+            for mp in I.M
+            if m != mp
+        ],
+        name="w"
+    )
+
+    # s[k]
+    s = mdl.binary_var_dict(
+        keys=[k for k in I.K],
+        name="s"
+    )
+
+    return x, y, r, w, s
+
 
 
 def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
     """
     Add all constraints of the taxi-like MILP model to the docplex model.
-
-    Parameters
-    ----------
-    mdl : docplex.mp.model.Model
-    I   : Instance
-        Data container with sets and parameters.
-    x, y, r, w, s : docplex binary var dicts
-        Decision variables as defined in the main script.
     """
-
     # Convenience
     N = I.N
     A = I.A
@@ -406,3 +442,31 @@ def add_taxi_like_objective(mdl, I, y, s):
 
     # Return objective expression if needed
     return C_oper + C_uns
+
+
+
+
+
+
+
+def create_taxi_like_model(I: Instance):
+    """
+    Create:
+        - Model()
+        - decision variables
+        - constraints
+        - objective
+    """
+
+    mdl = Model(name="TaxiLike")
+
+    # 1) variables
+    x, y, r, w, s = create_decision_variables(mdl, I)
+
+    # 2) constraints
+    add_taxi_like_constraints(mdl, I, x, y, r, w, s)
+
+    # 3) objective
+    add_taxi_like_objective(mdl, I, y, s)
+
+    return mdl, x, y, r, w, s

@@ -41,7 +41,8 @@ ThesisModBus/
 │   │   └── generate_demands.py    &nbsp;&nbsp;# simulator  → taxi-like_requests.json, bus-like_requests.json    
 │   │   
 │   │  
-│   ├── utils/   
+│   ├── utils/  
+│   │   ├── cplex_config.py        &nbsp;&nbsp;# CPLEX configurations for the solver of the model
 │   │   ├── instance.py            &nbsp;&nbsp;# class Instance   
 │   │   ├── loaders.py             &nbsp;&nbsp;# function to load the Parameters  
 │   │   ├── print_data.py          &nbsp;&nbsp;# function to print info   
