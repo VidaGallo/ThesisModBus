@@ -1,13 +1,18 @@
 # -------------------------
 # Python / Environments
 # -------------------------
+# Virtual environments
 .venv*
+.venv310/
+env/
+ENV/
 venv/
-.env
+VENV/
+
+# Python cache files
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
 
 # -------------------------
 # Solver files (Gurobi / CPLEX)
