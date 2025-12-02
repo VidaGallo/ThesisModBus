@@ -19,6 +19,7 @@ ThesisModBus/
 ├── .gitignore  
 ├── LICENSE  
 │  
+|
 ├── src/  
 │   ├── models/  
 │   │   ├── deterministic/  
@@ -28,21 +29,25 @@ ThesisModBus/
 │   │   └── stochastic/        
 │   │       └──general_two_stage.mod  
 │   │  
+│   │  
 │   ├── solvers/  
 │   │   ├── solve_cplex_deterministic.py   
 │   │   └── solve_cplex_stochastic.py  
 │   │  
-│   ├── data_generation/           # REMARK: continuous time   
-│   │   ├── generate_network.py    # graph construction → grid_network.json, city_network.json   
-│   │   ├── generate_bus_lines.py  # line construction    
-│   │   └── generate_demands.py    # simulator  → taxi-like_requests.json, bus-like_requests.json    
+│   │  
+│   ├── data_generation/           &nbsp;&nbsp;# REMARK: continuous time   
+│   │   ├── generate_network.py    &nbsp;&nbsp;# graph construction → grid_network.json, city_network.json   
+│   │   ├── generate_bus_lines.py  &nbsp;&nbsp;# line construction    
+│   │   └── generate_demands.py    &nbsp;&nbsp;# simulator  → taxi-like_requests.json, bus-like_requests.json    
 │   │   
+│   │  
 │   ├── utils/   
-│   │   ├── instance.py             # class Instance   
-│   │   ├── loaders.py              # function to load the Parameters  
-│   │   ├── print_data.py           # function to print info   
-│   │   └── time_discretization.py  # functions to discretize   
+│   │   ├── instance.py            &nbsp;&nbsp;# class Instance   
+│   │   ├── loaders.py             &nbsp;&nbsp;# function to load the Parameters  
+│   │   ├── print_data.py          &nbsp;&nbsp;# function to print info   
+│   │   └── time_discretization.py &nbsp;&nbsp;# functions to discretize   
 │   │   
+│   │  
 │   └── experiments/   
 │       ├── GRID/       
 │       │   ├── config.yaml   
@@ -54,12 +59,9 @@ ThesisModBus/
 │           ├── config.yaml    
 │           ├── run.py   
 │           ├── 01/  
-│           └── ...   
-│  
-├── instances/   
-│   ├── GRID/            
-│   └── CITY/           
+│           └── ...      
 │    
+│     
 └── results/  
     ├── GRID/   
     │   ├── logs/   
