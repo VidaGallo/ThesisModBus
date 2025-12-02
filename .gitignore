@@ -23,14 +23,9 @@ __pycache__/
 *.mst
 *.sol
 *.sav
-*.lp
 *.hlp
 
-# -------------------------
-# Results
-# -------------------------
-results/*
-!results/.gitkeep
+
 
 # -------------------------
 # Instances processed (heavy files)
