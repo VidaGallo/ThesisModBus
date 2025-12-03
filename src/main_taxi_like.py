@@ -31,7 +31,7 @@ if __name__ == "__main__":
     c_km = 1.0
     c_uns_taxi = 100
 
-    num_requests = 5         # how many taxi-like requests to generate
+    num_requests = 3         # how many taxi-like requests to generate
     q_min = 1                 # min q_k
     q_max = 3                 # max q_k
     slack_min = 20.0          # minutes of flexibility
@@ -121,20 +121,3 @@ if __name__ == "__main__":
         save_cplex_log(model, output_folder)
         save_solution_summary(solution, output_folder)
         save_solution_variables(solution, x, y, r, w, s, output_folder)
-
-
-    
-    if FLAG_VERBOSE:
-        full_report(
-            instance, solution, x, y, r, w, s,
-            network_path=network_path,
-            output_folder=output_folder,
-            display_instance_summary=True,
-            display_movements=True,
-            display_initial_grid=True,
-            display_timeline=True,
-            display_request_details=True,
-        )
-
-
-

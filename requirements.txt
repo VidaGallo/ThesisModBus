@@ -9,4 +9,6 @@ dataclasses
 typing
 docplex
 matplotlib
+time
+pandas
 
