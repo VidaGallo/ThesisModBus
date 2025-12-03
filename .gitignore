@@ -26,22 +26,8 @@ __pycache__/
 *.hlp
 
 
-
 # -------------------------
-# Instances processed (heavy files)
+# Results (heavy files)
 # -------------------------
-instances/formatted/*
-!instances/formatted/.gitkeep
-
-
-# -------------------------
-# VS Code
-# -------------------------
-.vscode/
-.settings/
-
-# -------------------------
-# OS files
-# -------------------------
-.DS_Store
-Thumbs.db
+results/*
+!results/.gitkeep
