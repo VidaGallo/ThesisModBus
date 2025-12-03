@@ -88,7 +88,7 @@ def discretize_taxi_requests(
     with out_path.open("w", encoding="utf-8") as f:
         json.dump(requests, f, indent=2)
 
-    print(f"[INFO] Discretized requests saved to: {out_path}")
+    #print(f"[INFO] Discretized requests saved to: {out_path}")
 
 
 
@@ -129,7 +129,7 @@ def discretize_network_travel_times(
     with out_path.open("w", encoding="utf-8") as f:
         json.dump(net, f, indent=2)
 
-    print(f"[INFO] Discretized network saved to: {out_path}")
+    #print(f"[INFO] Discretized network saved to: {out_path}")
 
 
 

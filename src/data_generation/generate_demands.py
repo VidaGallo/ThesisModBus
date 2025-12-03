@@ -199,7 +199,7 @@ def save_requests(path: str, requests: list) -> None:
     with out_path.open("w", encoding="utf-8") as f:
         json.dump(requests, f, indent=2)
 
-    print(f"[INFO] Saved {len(requests)} requests to: {out_path}")
+    #print(f"[INFO] Saved {len(requests)} requests to: {out_path}")
 
 
 

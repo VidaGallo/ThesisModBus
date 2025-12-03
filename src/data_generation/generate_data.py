@@ -93,8 +93,8 @@ def generate_all_data(
         time_step_min=float(dt),
     )
 
-    print("\n[DATA GENERATION COMPLETE]")
-    print("Continuous and discrete data created in:", base)
+    #print("\n[DATA GENERATION COMPLETE]")
+    #print("Continuous and discrete data created in:", base)
 
 
 

@@ -176,7 +176,7 @@ def save_network_json(network_dict: dict, output_dir: str, filename: str = "netw
     with out_path.open("w", encoding="utf-8") as f:
         json.dump(network_dict, f, indent=2)
 
-    print(f"[INFO] Saved network to: {out_path}")
+    #print(f"[INFO] Saved network to: {out_path}")
 
 
 
@@ -207,6 +207,6 @@ if __name__ == "__main__":
         filename="network.json"
     )
 
-    print(f"[INFO] Network generated: GRID {folder_name}")
-    print(f"[INFO] Saved in: {output_folder}/network.json")
+    #print(f"[INFO] Network generated: GRID {folder_name}")
+    #print(f"[INFO] Saved in: {output_folder}/network.json")
 

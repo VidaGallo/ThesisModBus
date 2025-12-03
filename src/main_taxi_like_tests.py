@@ -248,8 +248,5 @@ if __name__ == "__main__":
     summary_path = "results/summary_experiments.csv"
     df_results.to_csv(summary_path, index=False)
 
-    print("\n" + "#"*80)
-    print("FINAL SUMMARY DATAFRAME")
-    print("#"*80)
-    print(df_results)
+    print("\n\n\n" + "#"*80)
     print(f"\nSummary saved to: {summary_path}")
