@@ -222,7 +222,7 @@ if __name__ == "__main__":
     # --------------------------
     ### Grid of experiments  ###
     # --------------------------
-    grid_numbers      = [3]     # grid side (number x number)
+    grid_numbers      = [4]     # grid side (number x number)
     horizons          = [100]            # time horizon in minutes (continuous)
     num_modules_list  = [1, 3, 5]              # number of modules
     num_requests_list = [10]         # how many taxi-like requests
@@ -274,7 +274,7 @@ if __name__ == "__main__":
     df_results = pd.DataFrame(all_results)
 
     # Where to save the summary (inside results/)
-    summary_path = "results/summary_experiments_3x3.csv"
+    summary_path = f"results/summary_experiments_{number}x{number}.csv"
     df_results.to_csv(summary_path, index=False)
 
     print("\n\n\n" + "#"*80)
