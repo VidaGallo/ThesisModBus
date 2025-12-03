@@ -201,7 +201,7 @@ def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
     # ------------------------------------------------------------------
     for k in K:
         # All times t where request k is allowed to alight at some node i
-        out_times_k = sorted({t for (kk, i, t) in d_out.keys() if kk == k})
+        out_times_k = sorted({t for (kk, i, t) in d_out.keys() if kk == k})     ### <--- It is enough to check ΔT_out_k
 
         if not out_times_k:
             # No feasible drop-off time → the request can never be completed

@@ -11,7 +11,7 @@ def configure_cplex(
     max_nodes: int = None,
     max_sol: int = None,
     presolve_level: int = 1,        # preresolve
-    aggregator_level: int = 1,      # aggregation of rows/columns
+    aggregator_level: int = 0,      # aggregation of rows/columns
     cuts: int = -1                  # cutting planes
 ):
     """

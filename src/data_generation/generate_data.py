@@ -60,7 +60,7 @@ def generate_all_data(
     ### GENERATE CONTINUOUS NETWORK
     network = generate_grid_network(
         side=number,
-        edge_length_km=1.0,
+        edge_length_km=3.0,
         speed_kmh=40.0,
     )
     save_network_json(network, base, filename="network.json")

@@ -10,6 +10,7 @@ import time
 import random
 import numpy as np
 import pandas as pd
+import os
 
 
 
@@ -27,6 +28,7 @@ def run_single_experiment(
     slack_min: float,
     depot: int,
     seed: int,
+    run: int 
 ) -> dict:
     """
     Run ONE experiment with given parameters and return a dictionary with summary results.
@@ -57,6 +59,7 @@ def run_single_experiment(
         q_max=q_max,
         slack_min=slack_min,
     )
+
 
     # -------------------
     ### Load Instance ###
@@ -105,6 +108,9 @@ def run_single_experiment(
         t_max=instance.t_max,
         dt=instance.dt,
     )
+    output_folder = output_folder / f"run{run}"
+    output_folder.mkdir()
+    print(output_folder)
 
     ### Save logs, stats, summary
     save_model_stats(model, output_folder)
@@ -255,6 +261,7 @@ if __name__ == "__main__":
                             slack_min=slack_min,
                             depot=depot,
                             seed=seed,
+                            run=exp_id
                         )
 
                         # add experiment id in the result
@@ -267,7 +274,7 @@ if __name__ == "__main__":
     df_results = pd.DataFrame(all_results)
 
     # Where to save the summary (inside results/)
-    summary_path = "results/summary_experiments_new.csv"
+    summary_path = "results/summary_experiments_3x3.csv"
     df_results.to_csv(summary_path, index=False)
 
     print("\n\n\n" + "#"*80)

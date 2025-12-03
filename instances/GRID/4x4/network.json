@@ -1,0 +1,377 @@
+{
+  "type": "GRID",
+  "side": 4,
+  "nodes": [
+    {
+      "id": 0,
+      "row": 0,
+      "col": 0
+    },
+    {
+      "id": 1,
+      "row": 0,
+      "col": 1
+    },
+    {
+      "id": 2,
+      "row": 0,
+      "col": 2
+    },
+    {
+      "id": 3,
+      "row": 0,
+      "col": 3
+    },
+    {
+      "id": 4,
+      "row": 1,
+      "col": 0
+    },
+    {
+      "id": 5,
+      "row": 1,
+      "col": 1
+    },
+    {
+      "id": 6,
+      "row": 1,
+      "col": 2
+    },
+    {
+      "id": 7,
+      "row": 1,
+      "col": 3
+    },
+    {
+      "id": 8,
+      "row": 2,
+      "col": 0
+    },
+    {
+      "id": 9,
+      "row": 2,
+      "col": 1
+    },
+    {
+      "id": 10,
+      "row": 2,
+      "col": 2
+    },
+    {
+      "id": 11,
+      "row": 2,
+      "col": 3
+    },
+    {
+      "id": 12,
+      "row": 3,
+      "col": 0
+    },
+    {
+      "id": 13,
+      "row": 3,
+      "col": 1
+    },
+    {
+      "id": 14,
+      "row": 3,
+      "col": 2
+    },
+    {
+      "id": 15,
+      "row": 3,
+      "col": 3
+    }
+  ],
+  "edges": [
+    {
+      "u": 0,
+      "v": 4,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 0,
+      "v": 1,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 1,
+      "v": 5,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 1,
+      "v": 2,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 1,
+      "v": 0,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 2,
+      "v": 6,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 2,
+      "v": 3,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 2,
+      "v": 1,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 3,
+      "v": 7,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 3,
+      "v": 2,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 4,
+      "v": 8,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 4,
+      "v": 0,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 4,
+      "v": 5,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 5,
+      "v": 9,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 5,
+      "v": 1,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 5,
+      "v": 6,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 5,
+      "v": 4,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 6,
+      "v": 10,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 6,
+      "v": 2,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 6,
+      "v": 7,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 6,
+      "v": 5,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 7,
+      "v": 11,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 7,
+      "v": 3,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 7,
+      "v": 6,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 8,
+      "v": 12,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 8,
+      "v": 4,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 8,
+      "v": 9,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 9,
+      "v": 13,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 9,
+      "v": 5,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 9,
+      "v": 10,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 9,
+      "v": 8,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 10,
+      "v": 14,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 10,
+      "v": 6,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 10,
+      "v": 11,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 10,
+      "v": 9,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 11,
+      "v": 15,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 11,
+      "v": 7,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 11,
+      "v": 10,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 12,
+      "v": 8,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 12,
+      "v": 13,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 13,
+      "v": 9,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 13,
+      "v": 14,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 13,
+      "v": 12,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 14,
+      "v": 10,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 14,
+      "v": 15,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 14,
+      "v": 13,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 15,
+      "v": 11,
+      "length_km": 3.0,
+      "time_min": 4.5
+    },
+    {
+      "u": 15,
+      "v": 14,
+      "length_km": 3.0,
+      "time_min": 4.5
+    }
+  ],
+  "speed_kmh": 40.0
+}

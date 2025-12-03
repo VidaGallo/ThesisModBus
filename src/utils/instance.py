@@ -80,7 +80,7 @@ class Instance:
             degree[i] += 1
             degree[j] += 1   # grado non orientato
 
-        self.Nw = {i for i, deg in degree.items() if deg >= 4}
+        self.Nw = {i for i, deg in degree.items() if deg >= 3}
     
     @property  # attribute "read-only"
     def num_nodes(self) -> int:
