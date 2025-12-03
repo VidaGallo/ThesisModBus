@@ -56,8 +56,8 @@ def save_cplex_log(mdl: Model, output_folder: Path):
         f.write("==== CPLEX SOLVE LOG ====\n")
         f.write(str(mdl.solve_details))
 
-    print(f"[INFO] CPLEX model exported to: {lp_path}")
-    print(f"[INFO] CPLEX log saved to: {log_path}")
+    #print(f"[INFO] CPLEX model exported to: {lp_path}")
+    #print(f"[INFO] CPLEX log saved to: {log_path}")
 
 
 
@@ -74,7 +74,7 @@ def save_solution_summary(solution, output_folder: Path):
         f.write(f"Status: {solution.solve_status}\n")
         f.write(f"Gap: {solution.solve_details.mip_relative_gap}\n")
         f.write(f"Time: {solution.solve_details.time}\n")
-    print(f"[INFO] Summary saved to: {summary_path}")
+    #print(f"[INFO] Summary saved to: {summary_path}")
 
 
 def save_model_stats(mdl: Model, output_folder: Path):
@@ -88,7 +88,7 @@ def save_model_stats(mdl: Model, output_folder: Path):
         f.write(f"Binary Vars: {mdl.number_of_binary_variables}\n")
         f.write(f"Integer Vars: {mdl.number_of_integer_variables}\n")
         f.write(f"Constraints: {mdl.number_of_constraints}\n")
-    print(f"[INFO] Model stats saved to: {stats_path}")
+    #print(f"[INFO] Model stats saved to: {stats_path}")
 
 
 
@@ -169,4 +169,4 @@ def save_solution_variables(solution, x, y, r, w, s, output_folder):
             val = solution.get_value(var)
             f.write(f"{k},{val}\n")
 
-    print(f"[INFO] Decision variables saved in: {var_folder}")
+    #print(f"[INFO] Decision variables saved in: {var_folder}")

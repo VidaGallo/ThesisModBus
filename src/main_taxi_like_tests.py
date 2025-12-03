@@ -189,16 +189,16 @@ if __name__ == "__main__":
 
     q_min = 1                  # min q_k
     q_max = 3                  # max q_k
-    slack_min = 20.0           # minutes of flexibility
+    slack_min = 30.0           # minutes of flexibility
 
     # --------------------------
     ### Grid of experiments  ###
     # --------------------------
-    grid_numbers      = [3]        # grid side (number x number)
-    horizons          = [60]    # time horizon in minutes (continuous)
-    num_modules_list  = [2, 3]           # number of modules
-    num_requests_list = [3]       # how many taxi-like requests
-    seeds             = [42]             # for reproducibility
+    grid_numbers      = [10, 50, 100]     # grid side (number x number)
+    horizons          = [1000]            # time horizon in minutes (continuous)
+    num_modules_list  = [10]              # number of modules
+    num_requests_list = [50, 200]         # how many taxi-like requests
+    seeds             = [42]              # for reproducibility
 
     all_results = []
     exp_id = 0
