@@ -29,5 +29,8 @@ __pycache__/
 # -------------------------
 # Results (heavy files)
 # -------------------------
-results/*
-!results/.gitkeep
+results/GRID/*
+!results/GRID/.gitkeep
+
+results/CITY/*
+!results/CITY/.gitkeep
