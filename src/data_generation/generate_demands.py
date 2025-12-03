@@ -24,10 +24,12 @@ Outputs (continuous-time):
 """
 
 import json
-import random
 import networkx as nx
 from pathlib import Path
 import math
+import random
+
+random.seed(42)
 
 
 

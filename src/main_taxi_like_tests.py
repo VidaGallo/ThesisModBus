@@ -116,6 +116,26 @@ def run_single_experiment(
         save_solution_summary(solution, output_folder)
         save_solution_variables(solution, x, y, r, w, s, output_folder)
 
+
+
+    # -----------------------
+    ### SERVED SUMMARY   ###
+    # -----------------------
+    if solution is not None:
+        served = sum(int(solution.get_value(s[k]) > 0.5) for k in instance.K)
+        total  = len(instance.K)
+        served_ratio = served / total if total > 0 else 0.0
+    else:
+        served = 0
+        total  = len(instance.K)
+        served_ratio = 0.0
+
+    print(f"  -> served: {served}/{total}  ({served_ratio*100:.1f}%)")
+
+
+
+
+
     # -------------------
     ### Build summary ###
     # -------------------
@@ -144,6 +164,8 @@ def run_single_experiment(
         "c_km": c_km,
         "c_uns_taxi": c_uns_taxi,
         "num_requests": num_requests,
+        "served": served,
+        "served_ratio": served_ratio,
         "q_min": q_min,
         "q_max": q_max,
         "slack_min": slack_min,
@@ -194,10 +216,10 @@ if __name__ == "__main__":
     # --------------------------
     ### Grid of experiments  ###
     # --------------------------
-    grid_numbers      = [5, 10]     # grid side (number x number)
-    horizons          = [600]            # time horizon in minutes (continuous)
-    num_modules_list  = [5, 10]              # number of modules
-    num_requests_list = [20, 50]         # how many taxi-like requests
+    grid_numbers      = [3]     # grid side (number x number)
+    horizons          = [100]            # time horizon in minutes (continuous)
+    num_modules_list  = [1, 3, 5]              # number of modules
+    num_requests_list = [10]         # how many taxi-like requests
     seeds             = [42]              # for reproducibility
 
     all_results = []
@@ -245,7 +267,7 @@ if __name__ == "__main__":
     df_results = pd.DataFrame(all_results)
 
     # Where to save the summary (inside results/)
-    summary_path = "results/summary_experiments.csv"
+    summary_path = "results/summary_experiments_new.csv"
     df_results.to_csv(summary_path, index=False)
 
     print("\n\n\n" + "#"*80)

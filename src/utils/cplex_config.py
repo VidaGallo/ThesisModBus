@@ -10,8 +10,8 @@ def configure_cplex(
     parallel: int = 0,              # 0 = auto
     max_nodes: int = None,
     max_sol: int = None,
-    presolve_level: int = 2,        # preresolve strength
-    aggregator_level: int = 2,      # aggregation of rows/columns
+    presolve_level: int = 1,        # preresolve
+    aggregator_level: int = 1,      # aggregation of rows/columns
     cuts: int = -1                  # cutting planes
 ):
     """
@@ -52,10 +52,9 @@ def configure_cplex(
 
     max_sol : Maximum number of feasible solutions to keep/found.
 
-    presolve_level : Presolve level:
+    presolve_level : Presolve:
                     0 = off
-                    1 = standard
-                    2 = aggressive
+                    1 = on
 
     aggregator_level : Row/column aggregation level:
                     0 = off

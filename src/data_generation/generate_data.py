@@ -24,7 +24,9 @@ from pathlib import Path
 from .generate_network import *
 from .generate_demands import *
 from .time_discretization import *
+import random
 
+random.seed(42)
 
 
 def generate_all_data(

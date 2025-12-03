@@ -35,19 +35,25 @@ def create_decision_variables(mdl: Model, I: Instance):
         name="y"
     )
 
-    # r[k,t,m]
+    # r[k,t,m], only for t ∈ ΔT_k
     r = mdl.binary_var_dict(
-        keys=[(k, t, m) for k in I.K for t in I.T for m in I.M],
+        keys=[(k, t, m)
+              for k in I.K
+              for t in I.DeltaT[k]
+              for m in I.M],
         name="r"
     )
 
-    # w[k,i,t,m,mp]
+    # w[k,i,t,m,mp] only for:
+    #   - t ∈ ΔT_k (request is "alive")
+    #   - i ∈ Nw (internal nodes where swaps are allowed)
     w = mdl.binary_var_dict(
         keys=[
             (k, i, t, m, mp)
             for k in I.K
-            for i in I.N
-            for t in I.T
+            for t in I.DeltaT[k]
+            if t > I.T[0]    # no excanges at the beginning
+            for i in I.Nw
             for m in I.M
             for mp in I.M
             if m != mp
@@ -70,6 +76,7 @@ def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
     Add all constraints of the taxi-like MILP model to the docplex model.
     """
     N = I.N
+    Nw = I.Nw
     A = I.A
     M = I.M
     K = I.K
@@ -171,13 +178,19 @@ def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
     # ------------------------------------------------------------------
     # 5) Module capacity:
     #    sum_{k∈K} q_k * r[k,t,m] <= Q  ∀m,t
+    #    (only k s.t. (k,t,m) exists in r)
     # ------------------------------------------------------------------
     for m in M:
         for t in T:
             mdl.add_constraint(
-                mdl.sum(q[k] * r[k, t, m] for k in K) <= Q,
+                mdl.sum(
+                    q[k] * r[k, t, m]
+                    for k in K
+                    if (k, t, m) in r
+                ) <= Q,
                 ctname=f"capacity_m{m}_t{t}"
             )
+
 
 
     # ------------------------------------------------------------------
@@ -198,11 +211,17 @@ def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
         terms = []
         for m in M:
             for t in out_times_k:
-                if t == t0:
-                    # No r[k, t0-1, m] exists → only consider -r[k, t0, m]
-                    terms.append(- r[k, t, m])
+                # r[k, t, m] esiste solo se (k, t, m) in r
+                if (k, t, m) not in r:
+                    # se non esiste, contribuisce 0 al bilancio (sia r_t che r_{t-1})
+                    continue
+
+                prev_t = t - 1
+                if (k, prev_t, m) in r:
+                    terms.append(r[k, prev_t, m] - r[k, t, m])
                 else:
-                    terms.append(r[k, t-1, m] - r[k, t, m])
+                    # nessuna variabile r[k, t-1, m] definita → r[k,t-1,m]=0
+                    terms.append(- r[k, t, m])
 
         expr = mdl.sum(terms)
 
@@ -212,23 +231,11 @@ def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
         )
 
 
-    # ------------------------------------------------------------------
-    # 7) Outside ΔT_k:
-    #    sum_m r[k,t,m] = 0  ∀k, t ∉ ΔT_k
-    # ------------------------------------------------------------------
-    all_T = set(T)
-    for k in K:
-        allowed_T = set(DeltaT[k])
-        forbidden_T = all_T - allowed_T
-        for t in forbidden_T:
-            mdl.add_constraint(
-                mdl.sum(r[k, t, m] for m in M) == 0,
-                ctname=f"outside_window_k{k}_t{t}"
-            )
+
 
 
     # ------------------------------------------------------------------
-    # 8) At most one module serves k:
+    # 7) At most one module serves k:
     #    sum_m r[k,t,m] <= 1  ∀k, t ∈ ΔT_k
     # ------------------------------------------------------------------
     for k in K:
@@ -239,8 +246,10 @@ def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
             )
 
 
+
+
     # ------------------------------------------------------------------
-    # 9) Excange constraints w:
+    # 8) Excange constraints w:
     #    (a) w <= r[k,t-1,m]
     #    (b) w <= x[m,i,t]
     #    (c) w <= x[mp,i,t]
@@ -251,8 +260,8 @@ def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
 
     # (a), (b), (c): local constraints on each w
     for k in K:
-        for t in T_pos:  
-            for i in N:
+        for t in DeltaT[k]:
+            for i in Nw:
                 for m in M:
                     for mp in M:
                         if m == mp:
@@ -261,12 +270,21 @@ def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
                         if (k, i, t, m, mp) not in w:
                             continue
 
-                        # The swap can occur only if the request was on m at time t-1
-                        mdl.add_constraint(
-                            w[k, i, t, m, mp] <= r[k, t-1, m],
-                            ctname=f"swap_only_if_onboard_k{k}_i{i}_t{t}_m{m}_mp{mp}"
-                        )
-                        # The modules must be at the same node i at time t
+                        # (a) The swap can occur only if the request was on m at time t-1
+                        prev_t = t - 1
+                        if (k, prev_t, m) in r:
+                            mdl.add_constraint(
+                                w[k, i, t, m, mp] <= r[k, prev_t, m],
+                                ctname=f"swap_only_if_onboard_k{k}_i{i}_t{t}_m{m}_mp{mp}"
+                            )
+                        else:
+                            # se r[k,t-1,m] non esiste, vuol dire "non può essere a bordo" → w<=0
+                            mdl.add_constraint(
+                                w[k, i, t, m, mp] <= 0,
+                                ctname=f"swap_only_if_onboard_k{k}_i{i}_t{t}_m{m}_mp{mp}"
+                            )
+
+                        # (b)(c) The modules must be at the same node i at time t
                         mdl.add_constraint(
                             w[k, i, t, m, mp] <= x[m, i, t],
                             ctname=f"swap_same_node1_k{k}_i{i}_t{t}_m{m}_mp{mp}"
@@ -276,19 +294,21 @@ def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
                             ctname=f"swap_same_node2_k{k}_i{i}_t{t}_m{m}_mp{mp}"
                         )
 
+
     # (d) At most 1 swap per k,t
     for k in K:
         for t in DeltaT[k]:  
             mdl.add_constraint(
                 mdl.sum(
                     w[k, i, t, m, mp]
-                    for i in N
+                    for i in Nw
                     for m in M
                     for mp in M
                     if m != mp and (k, i, t, m, mp) in w
                 ) <= 1,
                 ctname=f"one_swap_k{k}_t{t}"
             )
+
 
     # (e) Module m "loses" the request
     for k in K:
@@ -298,12 +318,14 @@ def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
                     r[k, t, m] <=
                     1 - mdl.sum(
                         w[k, i, t, m, mp]
-                        for i in N
+                        for i in Nw
                         for mp in M
                         if mp != m and (k, i, t, m, mp) in w
                     ),
                     ctname=f"lose_req_k{k}_t{t}_m{m}"
                 )
+
+
 
     # (f) Module mp "receives" the request
     for k in K:
@@ -313,23 +335,15 @@ def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
                     r[k, t, mp] >=
                     mdl.sum(
                         w[k, i, t, m, mp]
-                        for i in N
+                        for i in Nw
                         for m in M
                         if m != mp and (k, i, t, m, mp) in w
                     ),
                     ctname=f"receive_req_k{k}_t{t}_mp{mp}"
                 )
 
-    # No excanges at t0
-    for k in K:
-        for i in N:
-            for m in M:
-                for mp in M:
-                    if m != mp and (k, i, t0, m, mp) in w:
-                        mdl.add_constraint(
-                            w[k, i, t0, m, mp] == 0,
-                            ctname=f"no_swap_at_t0_k{k}_i{i}_m{m}_mp{mp}"
-                        )
+    
+
 
     # ------------------------------------------------------------------
     # 10) Boarding / Alighting constraints with d_in, d_out
@@ -343,16 +357,23 @@ def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
     #   r[k,t,m] - r[k,t-1,m] >=
     #      - sum_i x[m,i,t] d_out[k,i,t]
     #      - sum_i sum_{m'≠m} w[k,i,t,m,m']
+    #
+    # con la convenzione:
+    #   se r[k,t-1,m] non è definita (t-1 ∉ ΔT_k), allora r[k,t-1,m] = 0.
     # ------------------------------------------------------------------
     for k in K:
-        times_k = DeltaT[k]
+        times_k = DeltaT[k]      # solo istanti dove r[k,t,·] esiste
         for t in times_k:
             for m in M:
-                # LHS
-                if t == t0:    # r[k,t0-1,m] does not exist
-                    lhs = r[k, t, m]
-                else:
+                # LHS = r[k,t,m] - r[k,t-1,m] se r[k,t-1,m] esiste, altrimenti r[k,t,m]
+                if (k, t, m) not in r:
+                    # per sicurezza (non dovrebbe succedere, visto che t ∈ ΔT_k)
+                    continue
+
+                if (k, t-1, m) in r:
                     lhs = r[k, t, m] - r[k, t-1, m]
+                else:
+                    lhs = r[k, t, m]
 
                 # RHS salita: sum_i x[m,i,t] * d_in[k,i,t]
                 boarding_terms = []
@@ -361,7 +382,7 @@ def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
                         boarding_terms.append(x[m, i, t])
                 # + scambi in ingresso w[k,i,t,m',m]
                 swap_in_terms = []
-                for i in N:
+                for i in Nw:
                     for mp in M:
                         if mp == m:
                             continue
@@ -382,7 +403,7 @@ def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
                         alight_terms.append(x[m, i, t])
                 # + scambi in uscita w[k,i,t,m,m']
                 swap_out_terms = []
-                for i in N:
+                for i in Nw:
                     for mp in M:
                         if mp == m:
                             continue
@@ -395,6 +416,7 @@ def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
                     lhs >= rhs_down,
                     ctname=f"alighting_or_swap_out_k{k}_t{t}_m{m}"
                 )
+
 
 
 
