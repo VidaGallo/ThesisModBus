@@ -21,9 +21,9 @@ if __name__ == "__main__":
     ### Parameters ###
     # ----------------
     dt = 5                    # minutes per slot
-    horizon = 100             # time horizon in minutes (continuous)
+    horizon = 60             # time horizon in minutes (continuous)
     t_max = horizon // dt     # number of discrete time slots
-    number = 5                # grid side (number x number)
+    number = 3                # grid side (number x number)
     depot = 0
 
     num_modules = 2
@@ -31,10 +31,10 @@ if __name__ == "__main__":
     c_km = 1.0
     c_uns_taxi = 100
 
-    num_requests = 10         # how many taxi-like requests to generate
+    num_requests = 5         # how many taxi-like requests to generate
     q_min = 1                 # min q_k
     q_max = 3                 # max q_k
-    slack_min = 10.0          # minutes of flexibility
+    slack_min = 20.0          # minutes of flexibility
 
 
 
@@ -72,8 +72,7 @@ if __name__ == "__main__":
         depot=depot
     )
 
-    if FLAG_VERBOSE:
-        print_instance_summary(instance)
+
 
 
 

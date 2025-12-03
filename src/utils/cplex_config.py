@@ -8,7 +8,7 @@ def configure_cplex(
     threads: int = 4,               # max threads
     mip_display: int = 1,           # MIP log verbosity
     emphasis_mip: int = 2,          # 2=optimality
-    parallel: int = 2,              # 2=deterministic
+    parallel: int = 0,              # 0=auto
     max_nodes: int = None,       
     max_sol: int = None   
 ):

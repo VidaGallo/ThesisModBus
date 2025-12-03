@@ -18,7 +18,8 @@ import matplotlib.pyplot as plt
 def print_instance_summary(inst: Instance):
     """Pretty-print full content of an Instance."""
 
-    print("\n" + "="*123)
+    print("\n\n\n" + "="*100)
+    print("="*100)
     print("INSTANCE SUMMARY:1n")
 
     ### Global info
@@ -68,7 +69,7 @@ def print_instance_summary(inst: Instance):
     print("\n--->Sparse d_out (first 10)")
     print(inst.d_out)
 
-    print("\n" + "="*123 + "\n")
+    print("\n" + "="*100 + "\n\n")
 
 
 
@@ -357,8 +358,8 @@ def debug_full_system_timeline(
 
     """
 
-    print("\n\n\n" + "#" * 80)
-    print("DEBUG: FULL SYSTEM TIMELINE")
+    print("\n\n\n\n" + "=" * 100)
+    print("=" * 100)
 
 
     # Pre-extract r values in a dict for faster access
@@ -381,9 +382,9 @@ def debug_full_system_timeline(
     # MAIN LOOP ON TIME
     # ------------------------------------------------------------------
     for t in T:
-        print("\n" + "=" * 50)
+        print("\n" + "=" * 33)
         print(f"TIME t = {t}")
-        print("=" * 50)
+        print("\n" + "=" * 33)
 
         # ==============================================================
         # 1) MODULE POSITIONS AND MOVEMENTS
@@ -573,7 +574,8 @@ def debug_requests_details(
       - primo boarding e ultima alighting (se esistono)
     """
 
-    print("\n" + "#" * 80)
+    print("\n\n\n\n" + "=" * 100)
+    print("=" * 100)
     print("DEBUG: REQUEST-LEVEL SUMMARY")
 
     # valori r
@@ -586,9 +588,9 @@ def debug_requests_details(
             s_val[k] = solution.get_value(var)
 
     for k in K:
-        print("\n" + "=" * 50)
+        print("\n" + "=" * 33)
         print(f"REQUEST k = {k}")
-        print("=" * 50)
+        print("=" * 33)
 
         times_k = sorted(DeltaT[k])
         print(f"- DeltaT[k]: {times_k}")
