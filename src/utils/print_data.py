@@ -648,3 +648,107 @@ def debug_requests_details(
         else:
             print("  Nessun ALIGHT individuato.")
 
+
+
+
+
+
+
+
+def full_report(
+    instance,
+    solution,
+    x,
+    y,
+    r,
+    w,
+    s,
+    network_path,
+    output_folder,
+    display_instance_summary=True,
+    display_movements=True,
+    display_initial_grid=True,
+    display_timeline=True,
+    display_request_details=True,
+):
+    """
+    Master verbose/debug report.
+
+    Each component can be enabled/disabled individually using flags.
+
+    Parameters:
+    -----------
+    display_instance_summary : bool
+        If True → prints full instance summary.
+    display_movements : bool
+        If True → prints module movements and positions.
+    display_initial_grid : bool
+        If True → plots the initial grid with module locations.
+    display_timeline : bool
+        If True → prints full step-by-step system timeline.
+    display_request_details : bool
+        If True → prints detailed request-level breakdown.
+    """
+
+    t0 = min(instance.T)
+
+
+    ### (1) Instance Summary
+    if display_instance_summary:
+        print_instance_summary(instance)
+
+
+
+    ### (2) Initial Grid Snapshot
+    if display_initial_grid:
+        initial_snapshot_path = output_folder / f"initial_grid_t{t0}.png"
+        plot_initial_grid_with_modules(
+            I=instance,
+            solution=solution,
+            x=x,
+            network_path=network_path,
+            t0=t0,
+            output_path=initial_snapshot_path,
+        )
+    
+    
+    ### (3) Movements + Positions
+    if display_movements:
+        print_solution_movements_and_positions(instance, solution, x, y)
+
+
+
+    ### (4) Full Timeline Debug
+    if display_timeline:
+        debug_full_system_timeline(
+            K=instance.K,
+            M=instance.M,
+            N=instance.N,
+            T=instance.T,
+            DeltaT=instance.DeltaT,
+            t0=t0,
+            solution=solution,
+            x=x,
+            y=y,
+            r=r,
+            w=w,
+            s=s,
+        )
+
+
+    ### (5) Request-Level Details
+    if display_request_details:
+        debug_requests_details(
+            K=instance.K,
+            M=instance.M,
+            N=instance.N,
+            T=instance.T,
+            DeltaT=instance.DeltaT,
+            t0=t0,
+            solution=solution,
+            r=r,
+            d_in=instance.d_in,
+            d_out=instance.d_out,
+            q=getattr(instance, "q", None),
+            s=s,
+        )

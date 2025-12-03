@@ -18,60 +18,49 @@ ThesisModBus/
 ├── requirements.txt   
 ├── .gitignore  
 ├── LICENSE  
-│  
-|
-├── src/  
-│   ├── models/  
-│   │   ├── deterministic/  
-│   │   │   ├── taxi_like.mod  
-│   │   │   └── general.mod  
-│   │   │  
-│   │   └── stochastic/        
-│   │       └──general_two_stage.mod  
-│   │  
-│   │  
-│   ├── solvers/  
-│   │   ├── solve_cplex_deterministic.py   
-│   │   └── solve_cplex_stochastic.py  
-│   │  
-│   │  
-│   ├── data_generation/           &nbsp;&nbsp;# REMARK: continuous time   
-│   │   ├── generate_network.py    &nbsp;&nbsp;# graph construction → grid_network.json, city_network.json   
-│   │   ├── generate_bus_lines.py  &nbsp;&nbsp;# line construction    
-│   │   └── generate_demands.py    &nbsp;&nbsp;# simulator  → taxi-like_requests.json, bus-like_requests.json    
-│   │   
-│   │  
-│   ├── utils/  
-│   │   ├── cplex_config.py        &nbsp;&nbsp;# CPLEX configurations for the solver of the model
-│   │   ├── instance.py            &nbsp;&nbsp;# class Instance   
-│   │   ├── loaders.py             &nbsp;&nbsp;# function to load the Parameters  
-│   │   ├── print_data.py          &nbsp;&nbsp;# function to print info   
-│   │   └── time_discretization.py &nbsp;&nbsp;# functions to discretize   
-│   │   
-│   │  
-│   └── experiments/   
-│       ├── GRID/       
-│       │   ├── config.yaml   
-│       │   ├── run.py   
-│       │   ├── 01/   
-│       │   ├── 02/   
-│       │   └── ...   
-│       └── CITY/       
-│           ├── config.yaml    
-│           ├── run.py   
-│           ├── 01/  
-│           └── ...      
-│    
 │     
-└── results/  
-    ├── GRID/   
-    │   ├── logs/   
-    │   ├── solutions/   
-    │   ├── figures/    
-    │   └── tables/    
-    └── CITY/    
-        ├── logs/   
-        ├── solutions/     
-        ├── figures/    
-        └── tables/   
-     
+|   
+|   
+├── instances/         
+|   ├── GRID/   
+│   |   ├── ...   
+|   |    
+│   └── CITY/  
+│       ├── ...   
+|   
+|      
+├── results/           
+|   ├── GRID/    
+│   |   ├── ...    
+|   |     
+│   └── CITY/   
+│       ├── ...    
+|    
+|   
+└── src/   
+    ├── models/   
+    │   ├── deterministic/   
+    │   │   ├── taxi_like.mod   
+    │   │   └── general.mod   
+    │   │   
+    │   └── stochastic/          
+    │       └──general_two_stage.mod    
+    │    
+    │    
+    ├── data_generation/        
+    │   ├── generate_data.py       &nbsp;&nbsp;# data generation and discretization     
+    │   ├── generate_network.py    &nbsp;&nbsp;# generate networks (continuous time)     
+    │   ├── generate_demands.py    &nbsp;&nbsp;# generate demands (continuous time)  
+    |   └── time_discretization.py &nbsp;&nbsp;# functions to discretize     
+    │    
+    │   
+    ├── utils/  
+    │   ├── cplex_config.py        &nbsp;&nbsp;# CPLEX configurations for the solver of the model    
+    │   ├── instance.py            &nbsp;&nbsp;# class Instance      
+    │   ├── loaders.py             &nbsp;&nbsp;# function to load the Parameters     
+    |   ├── outputs.py             &nbsp;&nbsp;# savign and managin outputs    
+    │   ├── print_data.py          &nbsp;&nbsp;# function to print info    
+    │      
+    │    
+    │  
+    └── main_taxi_like.py

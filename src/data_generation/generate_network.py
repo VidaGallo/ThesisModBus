@@ -164,12 +164,6 @@ Notes:
 
 
 
-
-
-#######
-# MAIN:
-#######
-
 def save_network_json(network_dict: dict, output_dir: str, filename: str = "network.json") -> None:
     """
     Save a network dictionary to a JSON file.
@@ -186,6 +180,10 @@ def save_network_json(network_dict: dict, output_dir: str, filename: str = "netw
 
 
 
+
+
+
+### TEST MAIN ###
 if __name__ == "__main__":
     side = 3                # grid side dimension
     edge_length_km = 1.0    

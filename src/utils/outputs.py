@@ -89,3 +89,84 @@ def save_model_stats(mdl: Model, output_folder: Path):
         f.write(f"Integer Vars: {mdl.number_of_integer_variables}\n")
         f.write(f"Constraints: {mdl.number_of_constraints}\n")
     print(f"[INFO] Model stats saved to: {stats_path}")
+
+
+
+
+
+
+
+
+
+
+def save_solution_variables(solution, x, y, r, w, s, output_folder):
+    """
+    Save all decision variables that are equal to 1 (or >0.5 threshold)
+    into CSV files inside:  output_folder / "variables" / ...
+
+    Creates:
+        variables/x_positions.csv
+        variables/y_movements.csv
+        variables/r_assignments.csv
+        variables/w_swaps.csv
+        variables/s_served.csv
+    """
+
+    thr = 0.5  # threshold
+
+    # -------------------------
+    # Create subfolder: variables/
+    # -------------------------
+    var_folder = output_folder / "variables"
+    var_folder.mkdir(parents=True, exist_ok=True)
+
+    # -------------------------
+    # X: module positions
+    # -------------------------
+    with (var_folder / "x_positions.csv").open("w") as f:
+        f.write("m,i,t,val\n")
+        for (m, i, t), var in x.items():
+            val = solution.get_value(var)
+            if val > thr:
+                f.write(f"{m},{i},{t},{val}\n")
+
+    # -------------------------
+    # Y: module movements
+    # -------------------------
+    with (var_folder / "y_movements.csv").open("w") as f:
+        f.write("m,i,j,t,val\n")
+        for (m, i, j, t), var in y.items():
+            val = solution.get_value(var)
+            if val > thr:
+                f.write(f"{m},{i},{j},{t},{val}\n")
+
+    # -------------------------
+    # R: request assignments
+    # -------------------------
+    with (var_folder / "r_assignments.csv").open("w") as f:
+        f.write("k,t,m,val\n")
+        for (k, t, m), var in r.items():
+            val = solution.get_value(var)
+            if val > thr:
+                f.write(f"{k},{t},{m},{val}\n")
+
+    # -------------------------
+    # W: swaps
+    # -------------------------
+    with (var_folder / "w_swaps.csv").open("w") as f:
+        f.write("k,i,t,m,mp,val\n")
+        for (k, i, t, m, mp), var in w.items():
+            val = solution.get_value(var)
+            if val > thr:
+                f.write(f"{k},{i},{t},{m},{mp},{val}\n")
+
+    # -------------------------
+    # S: served
+    # -------------------------
+    with (var_folder / "s_served.csv").open("w") as f:
+        f.write("k,val\n")
+        for k, var in s.items():
+            val = solution.get_value(var)
+            f.write(f"{k},{val}\n")
+
+    print(f"[INFO] Decision variables saved in: {var_folder}")

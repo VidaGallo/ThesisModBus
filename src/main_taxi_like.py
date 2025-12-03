@@ -1,10 +1,10 @@
 from utils.loader import *
 from utils.instance import *
-from utils.print_save_data import *
+from utils.print_data import *
 from models.deterministic.model_taxi_like import *
 from utils.cplex_config import *
 from utils.outputs import *
-
+from data_generation.generate_data import *
 
 
 
@@ -17,26 +17,49 @@ FLAG_VERBOSE = 1  # 1 for displaying everything, 0 for displaying nothing
 
 if __name__ == "__main__":
     
-    ### Parameters 
-    dt = 5              # minutes per slot
-    horizon = 100
-    t_max = horizon // dt   # e.g., time horizon 100 minutes → 20 slots
-    number = 5      # side of the grid
-    num_modules = 3
-    Q = 10
-    c_km = 1.0
-    c_uns_taxi = 100     # <------
-
+    # ----------------
+    ### Parameters ###
+    # ----------------
+    dt = 5                    # minutes per slot
+    horizon = 100             # time horizon in minutes (continuous)
+    t_max = horizon // dt     # number of discrete time slots
+    number = 5                # grid side (number x number)
     depot = 0
 
+    num_modules = 2
+    Q = 10
+    c_km = 1.0
+    c_uns_taxi = 100
 
-    ### File paths (already existing and discretized)
-    base = f"instances/GRID/{number}x{number}"    # Folder with Data
-    network_path = f"{base}/network_disc{dt}min.json"
-    requests_path = f"{base}/taxi_like_requests_{horizon}maxmin_disc{dt}min.json"
+    num_requests = 10         # how many taxi-like requests to generate
+    q_min = 1                 # min q_k
+    q_max = 3                 # max q_k
+    slack_min = 10.0          # minutes of flexibility
 
 
-    ### Load instance
+
+
+
+
+    # ---------------------
+    ### Data generation ###
+    # ---------------------
+    network_path, requests_path = generate_all_data(
+        number=number,
+        horizon=horizon,
+        dt=dt,
+        num_requests=num_requests,
+        q_min=q_min,
+        q_max=q_max,
+        slack_min=slack_min,
+    )
+
+
+
+
+    # -------------------
+    ### Load Instance ###
+    # -------------------
     instance = load_instance_discrete(
         network_path=network_path,
         requests_path=requests_path,
@@ -50,22 +73,28 @@ if __name__ == "__main__":
     )
 
     if FLAG_VERBOSE:
-        ### Check
         print_instance_summary(instance)
 
 
 
-    ### Model construction
-    model, x, y, r, w, s = create_taxi_like_model(instance)
 
 
-    ### Model configuration
-    configure_cplex(model)
+    # -----------
+    ### MODEL ###
+    # -----------
+    model, x, y, r, w, s = create_taxi_like_model(instance)   # model construction
+
+    configure_cplex(model)                                    # model configuration
+
+    solution = model.solve(log_output=True)                   # model solution
 
 
-    ### Model solution
-    solution = model.solve(log_output=True)
 
+    # ------------
+    ### OUTPUT ###
+    # ------------
+
+    # Solution print
     print("-"*77)
     if solution:
         print("Status:", solution.solve_status)
@@ -75,7 +104,7 @@ if __name__ == "__main__":
     print("-"*77)
 
 
-    ### Creation of the output folder
+    # Creation of the output folder
     output_folder = build_output_folder(
         base_dir="results",
         network_path=network_path,
@@ -92,53 +121,21 @@ if __name__ == "__main__":
     else:
         save_cplex_log(model, output_folder)
         save_solution_summary(solution, output_folder)
-
-        if FLAG_VERBOSE:
-            print_solution_movements_and_positions(instance, solution, x, y)
+        save_solution_variables(solution, x, y, r, w, s, output_folder)
 
 
+    
+    if FLAG_VERBOSE:
+        full_report(
+            instance, solution, x, y, r, w, s,
+            network_path=network_path,
+            output_folder=output_folder,
+            display_instance_summary=True,
+            display_movements=True,
+            display_initial_grid=True,
+            display_timeline=True,
+            display_request_details=True,
+        )
 
-    initial_snapshot_path = output_folder / "initial_grid_t0.png"
-
-    t0 = min(instance.T)
-    plot_initial_grid_with_modules(
-        I=instance,
-        solution=solution,
-        x=x,
-        network_path=network_path,
-        t0=t0,
-        output_path=initial_snapshot_path,
-    )
-
-
-    debug_full_system_timeline(
-        K = instance.K,
-        M = instance.M,
-        N = instance.N,
-        T = instance.T,
-        DeltaT = instance.DeltaT,
-        t0 = t0,
-        solution = solution,
-        x = x,
-        y = y,
-        r = r,
-        w = w,
-        s = s,
-    )
-
-    debug_requests_details(
-    K       = instance.K,
-    M       = instance.M,
-    N       = instance.N,
-    T       = instance.T,      # oppure instance.T se usi quello
-    DeltaT  = instance.DeltaT,
-    t0      = t0,
-    solution= solution,
-    r       = r,
-    d_in    = instance.d_in,
-    d_out   = instance.d_out,
-    q       = getattr(instance, "q", None),   # se q sta dentro instance
-    s       = s,
-    )
 
 

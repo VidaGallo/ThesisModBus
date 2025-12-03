@@ -205,7 +205,7 @@ def save_requests(path: str, requests: list) -> None:
 
 
 
-
+### TEST MAIN ###
 if __name__ == "__main__":
 
     network_path = "instances/GRID/3x3/network.json"   # Path to an already generated network

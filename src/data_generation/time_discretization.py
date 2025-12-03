@@ -133,6 +133,8 @@ def discretize_network_travel_times(
 
 
 
+
+### TEST MAIN ###
 if __name__ == "__main__":
 
     time_step_min = 5.0
