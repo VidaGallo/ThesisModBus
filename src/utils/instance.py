@@ -70,6 +70,17 @@ class Instance:
     ### --- depot ---
     depot: int = 0
 
+    ### --- internal nodes ---
+    Nw: Set[Node] = field(init=False)
+
+    def __post_init__(self):
+        """Automatic computation of Nw"""
+        degree = {i: 0 for i in self.N}
+        for (i, j) in self.A:
+            degree[i] += 1
+            degree[j] += 1   # grado non orientato
+
+        self.Nw = {i for i, deg in degree.items() if deg >= 4}
     
     @property  # attribute "read-only"
     def num_nodes(self) -> int:
@@ -86,18 +97,3 @@ class Instance:
         return len(self.M)
     
 
-
-    @property
-    def Nw(self) -> Set[Node]:
-        """
-        Nodi interni del grafo:
-        quelli con grado non orientato >= 3.
-        (cioè nodi con almeno 2 vicini → permettono scambio)
-        """
-        degree = {i: 0 for i in self.N}
-        for (i, j) in self.A:
-            degree[i] += 1
-            degree[j] += 1   # grado non orientato
-
-        # nodo interno = almeno 3 archi incidenti
-        return {i for i in self.N if degree[i] >= 3}

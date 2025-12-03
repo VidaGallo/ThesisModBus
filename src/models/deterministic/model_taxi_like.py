@@ -52,7 +52,7 @@ def create_decision_variables(mdl: Model, I: Instance):
             (k, i, t, m, mp)
             for k in I.K
             for t in I.DeltaT[k]
-            if t > I.T[0]    # no excanges at the beginning
+            if (t > I.T[0]) and (t < I.T[-1])    # no excanges at the beginning and at the end
             for i in I.Nw
             for m in I.M
             for mp in I.M
