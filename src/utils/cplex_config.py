@@ -5,7 +5,7 @@ def configure_cplex(
     mdl: Model,
     time_limit: float = 600.0,      # seconds
     mip_gap: float = 1e-5,          # 1e-5% relative gap
-    threads: int = 4,               # max threads
+    threads: int = 0,               # max threads
     mip_display: int = 1,           # MIP log verbosity
     emphasis_mip: int = 2,          # 2=optimality
     parallel: int = 0,              # 0=auto
