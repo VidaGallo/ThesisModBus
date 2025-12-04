@@ -35,7 +35,8 @@ def build_output_folder(base_dir: str, network_path: str, t_max: int, dt: int):
     network_group = net.parent.parent.name   # ex."GRID"
 
     folder = Path(base_dir) / network_group / network_dir / f"tmax{t_max*dt}_dt{dt}"
-    folder.mkdir(parents=True, exist_ok=True)
+    if not folder.exists():
+        folder.mkdir(parents=True)
 
     return folder
 
@@ -170,3 +171,80 @@ def save_solution_variables(solution, x, y, r, w, s, output_folder):
             f.write(f"{k},{val}\n")
 
     #print(f"[INFO] Decision variables saved in: {var_folder}")
+
+
+
+
+
+
+
+def save_solution_variables_new(solution, x, y, r, s, z, output_folder: Path):
+    """
+    Save all decision variables that are equal to 1 (or >0.5 threshold)
+    into CSV files inside:  output_folder / "variables" / ...
+
+    Creates:
+        variables/x_positions.csv
+        variables/y_movements.csv
+        variables/r_assignments.csv
+        variables/z_exchange_nodes.csv
+        variables/s_served.csv
+    """
+
+    thr = 0.5  # threshold
+
+    # -------------------------
+    # Create subfolder: variables/
+    # -------------------------
+    var_folder = output_folder / "variables"
+    var_folder.mkdir(parents=True, exist_ok=True)
+
+    # -------------------------
+    # X: module positions
+    # -------------------------
+    with (var_folder / "x_positions.csv").open("w") as f:
+        f.write("m,i,t,val\n")
+        for (m, i, t), var in x.items():
+            val = solution.get_value(var)
+            if val > thr:
+                f.write(f"{m},{i},{t},{val}\n")
+
+    # -------------------------
+    # Y: module movements
+    # -------------------------
+    with (var_folder / "y_movements.csv").open("w") as f:
+        f.write("m,i,j,t,val\n")
+        for (m, i, j, t), var in y.items():
+            val = solution.get_value(var)
+            if val > thr:
+                f.write(f"{m},{i},{j},{t},{val}\n")
+
+    # -------------------------
+    # R: request assignments (k on m at time t)
+    # -------------------------
+    with (var_folder / "r_assignments.csv").open("w") as f:
+        f.write("k,t,m,val\n")
+        for (k, t, m), var in r.items():
+            val = solution.get_value(var)
+            if val > thr:
+                f.write(f"{k},{t},{m},{val}\n")
+
+    # -------------------------
+    # Z: request k on module m at exchange node i, time t
+    #     (linearizzazione di r*x sui nodi di scambio Nw)
+    # -------------------------
+    with (var_folder / "z_exchange_nodes.csv").open("w") as f:
+        f.write("k,t,m,i,val\n")
+        for (k, t, m, i), var in z.items():
+            val = solution.get_value(var)
+            if val > thr:
+                f.write(f"{k},{t},{m},{i},{val}\n")
+
+    # -------------------------
+    # S: served (s_k)
+    # -------------------------
+    with (var_folder / "s_served.csv").open("w") as f:
+        f.write("k,val\n")
+        for k, var in s.items():
+            val = solution.get_value(var)
+            f.write(f"{k},{val}\n")

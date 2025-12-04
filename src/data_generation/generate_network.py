@@ -23,8 +23,10 @@ Output JSON contains:
 import json
 from pathlib import Path
 import random
+import osmnx as ox
+import networkx as nx
 
-random.seed(42)
+random.seed(23)
 
 
 #################
@@ -119,6 +121,172 @@ def generate_grid_network(
     return network_dict
 
 
+
+
+def generate_grid_network_asym(
+    side: int,
+    edge_length_km: float = 1.0,
+    speed_kmh: float = 40.0,
+) -> dict:
+    
+    """
+    Generate a side × side GRID network.
+
+    Parameters:
+        side : int
+            Number of nodes per side (total nodes = side * side).
+        edge_length_km : float
+            Length of each edge in kilometers (default: 1 km).
+        speed_kmh : float
+            Travel speed in km/h used to compute travel time (default: 40 km/h).
+    """
+
+    ### Nodes ###
+    nodes = []
+    for row in range(side):
+        for col in range(side):
+            node_id = row * side + col
+            nodes.append({
+                "id": node_id,
+                "row": row,    # x 
+                "col": col     # y
+            })
+
+    ### Travel time per edge (in minutes) ###
+    time_hours = edge_length_km / speed_kmh          # h
+    time_minutes = time_hours * 60.0                 # min (= ready for the discretization)
+
+    
+    ### Edges (4-neighbors: up, down, left, right) ###
+    edges = []
+
+    def node_id_from_rc(r: int, c: int) -> int:    # To give an ID to each node 
+        return r * side + c
+
+    directions = [
+        (1, 0),   # down
+        (-1, 0),  # up
+        (0, 1),   # right
+        (0, -1),  # left
+    ]
+
+    for row in range(side):
+        for col in range(side):
+            u = node_id_from_rc(row, col)
+            for dr, dc in directions:
+                r2 = row + dr
+                c2 = col + dc
+                if 0 <= r2 < side and 0 <= c2 < side:   # check for the borders
+                    v = node_id_from_rc(r2, c2)
+                    edges.append({              # append the edges 
+                        "u": u,
+                        "v": v,
+                        "length_km": float(edge_length_km),
+                        "time_min": float(time_minutes),
+                    })
+
+    
+    ### Creation of the network dict
+    network_dict = {
+        "type": "GRID",
+        "side": side,
+        "nodes": nodes,
+        "edges": edges,
+        "speed_kmh": float(speed_kmh),
+    }
+    return network_dict
+
+
+def generate_grid_network_asym(
+    side: int,
+    edge_length_km: float = 1.0,
+    speed_kmh: float = 40.0,
+    rel_std: float = 0.2,
+) -> dict:
+    """
+    Generate a side × side GRID network with asymmetric edge lengths.
+
+    Each directed edge (u -> v) gets a length drawn from a normal
+    distribution with mean = edge_length_km and std = rel_std * edge_length_km.
+
+    Parameters:
+        side : int
+            Number of nodes per side (total nodes = side * side).
+        edge_length_km : float
+            Base mean length of each edge in kilometers (default: 1 km).
+        speed_kmh : float
+            Travel speed in km/h used to compute travel time.
+        rel_std : float
+            Relative standard deviation for the normal noise
+            (e.g. 0.2 -> std = 0.2 * edge_length_km).
+    """
+
+    # --- Nodes ---
+    nodes = []
+    for row in range(side):
+        for col in range(side):
+            node_id = row * side + col
+            nodes.append({
+                "id": node_id,
+                "row": row,    # x
+                "col": col     # y
+            })
+
+    def node_id_from_rc(r: int, c: int) -> int:
+        return r * side + c
+
+    directions = [
+        (1, 0),   # down
+        (-1, 0),  # up
+        (0, 1),   # right
+        (0, -1),  # left
+    ]
+
+    edges = []
+
+    # funzione di supporto per campionare una lunghezza > 0
+    def sample_length():
+        mu = edge_length_km
+        sigma = rel_std * edge_length_km
+        # campiona finché non ottieni una lunghezza positiva
+        length = -1.0
+        while length <= 0:
+            length = random.gauss(mu, sigma)
+        return float(length)
+
+    for row in range(side):
+        for col in range(side):
+            u = node_id_from_rc(row, col)
+            for dr, dc in directions:
+                r2 = row + dr
+                c2 = col + dc
+                if 0 <= r2 < side and 0 <= c2 < side:
+                    v = node_id_from_rc(r2, c2)
+
+                    # lunghezza asimmetrica (per ogni direzione)
+                    length_km = sample_length()
+
+                    # travel time (in minuti) per questo arco specifico
+                    time_hours = length_km / speed_kmh
+                    time_minutes = time_hours * 60.0
+
+                    edges.append({
+                        "u": u,
+                        "v": v,
+                        "length_km": length_km,
+                        "time_min": float(time_minutes),
+                    })
+
+    network_dict = {
+        "type": "GRID_ASYM",
+        "side": side,
+        "nodes": nodes,
+        "edges": edges,
+        "speed_kmh": float(speed_kmh),
+        "base_edge_length_km": float(edge_length_km),
+        "rel_std": float(rel_std),
+    }
+    return network_dict
 
 
 

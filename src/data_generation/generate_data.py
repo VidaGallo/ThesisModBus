@@ -26,7 +26,7 @@ from .generate_demands import *
 from .time_discretization import *
 import random
 
-random.seed(42)
+random.seed(23)
 
 
 def generate_all_data(
@@ -62,6 +62,85 @@ def generate_all_data(
         side=number,
         edge_length_km=3.0,
         speed_kmh=40.0,
+    )
+    save_network_json(network, base, filename="network.json")
+
+
+    ### GENERATE CONTINUOUS REQUESTS
+    G = load_network_as_graph(network_cont)
+
+    taxi_requests = generate_taxi_requests(
+        G=G,
+        num_requests=num_requests,
+        q_min=q_min,
+        q_max=q_max,
+        slack_min=slack_min,
+        time_horizon_max=float(horizon),
+    )
+
+    save_requests(requests_cont, taxi_requests)
+
+
+
+    ### DISCRETIZE REQUESTS & NETWORK
+    discretize_taxi_requests(
+        input_path=requests_cont,
+        output_path=requests_disc,
+        time_step_min=float(dt),
+    )
+
+    discretize_network_travel_times(
+        input_path=network_cont,
+        output_path=network_disc,
+        time_step_min=float(dt),
+    )
+
+    #print("\n[DATA GENERATION COMPLETE]")
+    #print("Continuous and discrete data created in:", base)
+
+
+
+    # RETURN PATHS FOR THE MAIN
+    return network_disc, requests_disc
+
+
+
+
+
+def generate_all_data_asym(
+    number: int,
+    horizon: int,
+    dt: int,
+    num_requests: int,
+    q_min: int,
+    q_max: int,
+    slack_min: float,
+):
+    """
+    Generate continuous network + continuous requests,
+    then discretize both.
+
+    Returns:
+      network_disc_path, requests_disc_path
+    """
+
+    ### BUILD FOLDER
+    base = f"instances/GRID/{number}x{number}"
+    Path(base).mkdir(parents=True, exist_ok=True)
+
+    network_cont = f"{base}/network.json"
+    requests_cont = f"{base}/taxi_like_requests_{horizon}maxmin.json"
+
+    network_disc = f"{base}/network_disc{dt}min.json"
+    requests_disc = f"{base}/taxi_like_requests_{horizon}maxmin_disc{dt}min.json"
+
+
+    ### GENERATE CONTINUOUS NETWORK
+    network = generate_grid_network_asym(
+        side=number,
+        edge_length_km=3.33,
+        speed_kmh=40.0,
+        rel_std = 0.66
     )
     save_network_json(network, base, filename="network.json")
 

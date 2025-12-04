@@ -29,7 +29,7 @@ from pathlib import Path
 import math
 import random
 
-random.seed(42)
+random.seed(23)
 
 
 
@@ -56,7 +56,7 @@ def generate_taxi_requests(
     num_requests: int,
     q_min: int = 1,
     q_max: int = 3,
-    slack_min: float = 30.0,
+    slack_min: float = 20.0,
     time_horizon_max: float = 600.0,   # 10h
 ) -> list:
     """
