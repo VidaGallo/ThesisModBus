@@ -1,7 +1,7 @@
 from utils.loader import *
 from utils.instance import *
 from utils.print_data import *
-from models.deterministic.model_taxi_like_asym_new import *
+from models.deterministic.model_taxi_like_ab import *
 from utils.cplex_config import *
 from utils.outputs import *
 from data_generation.generate_data import *
@@ -79,7 +79,7 @@ def run_single_experiment(
     # -----------
     ### MODEL ###
     # -----------
-    model, x, y, r, s, z = create_taxi_like_model_asym_new(instance)   # model construction
+    model, x, y, r, w, s, a, b = create_taxi_like_model_ab(instance)   # model construction
     
 
     configure_cplex(model)                                    # model configuration
@@ -122,7 +122,7 @@ def run_single_experiment(
     else:
         save_cplex_log(model, output_folder)
         save_solution_summary(solution, output_folder)
-        save_solution_variables_new(solution, x, y, r, s, z, output_folder)
+        save_solution_variables(solution, x, y, r, w, s, output_folder)
 
 
 
@@ -210,7 +210,7 @@ if __name__ == "__main__":
     # ----------------
     ### Base params ###
     # ----------------
-    dt = 5                     # minutes per slot
+    dt = 7                     # minutes per slot
     depot = 0
 
     Q = 10
@@ -224,11 +224,11 @@ if __name__ == "__main__":
     # --------------------------
     ### Grid of experiments  ###
     # --------------------------
-    grid_numbers      = [3, 5, 8]        # grid side (number x number)
-    horizons          = [600]            # time horizon in minutes (continuous)
-    num_modules_list  = [1, 3]           # number of modules
-    num_requests_list = [20]             # how many taxi-like requests
-    seeds             = [23]             # for reproducibility
+    grid_numbers      = [5]     # grid side (number x number)
+    horizons          = [200]            # time horizon in minutes (continuous)
+    num_modules_list  = [3, 5, 10]              # number of modules
+    num_requests_list = [10]         # how many taxi-like requests
+    seeds             = [23]              # for reproducibility
 
     all_results = []
     exp_id = 0
@@ -276,7 +276,7 @@ if __name__ == "__main__":
     df_results = pd.DataFrame(all_results)
 
     # Where to save the summary (inside results/)
-    summary_path = f"results/summary_experiments_{number}x{number}_asym_new.csv"
+    summary_path = f"results/summary_experiments_{number}x{number}_h100_asym.csv"
     df_results.to_csv(summary_path, index=False)
 
     print("\n\n\n" + "#"*80)

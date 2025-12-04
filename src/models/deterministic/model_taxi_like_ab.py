@@ -18,7 +18,7 @@ from utils.instance import Instance
 
 
 
-def create_decision_variables_asym(mdl: Model, I: Instance):
+def create_decision_variables_ab(mdl: Model, I: Instance):
     """
     Create all MILP decision variables for the taxi-like model.
     """
@@ -69,13 +69,31 @@ def create_decision_variables_asym(mdl: Model, I: Instance):
         name="s"
     )
 
-    # >>> NEW: symmetry-breaking activation variables z_m
-    z = mdl.binary_var_dict(
-        keys=[m for m in I.M],
-        name="z"
+    
+    # a[k,t,m]
+    a = mdl.binary_var_dict(
+        keys=[
+            (k, t, m)
+            for k in I.K
+            for t in I.DeltaT[k]
+            for m in I.M
+        ],
+        name="a"
     )
 
-    return x, y, r, w, s, z
+    # b[k,t,m]
+    b = mdl.binary_var_dict(
+        keys=[
+            (k, t, m)
+            for k in I.K
+            for t in I.DeltaT[k]
+            for m in I.M
+        ],
+        name="b"
+    )
+
+
+    return x, y, r, w, s, a, b
 
 
 
@@ -83,7 +101,7 @@ def create_decision_variables_asym(mdl: Model, I: Instance):
 
 
 
-def add_taxi_like_constraints_asym(mdl, I, x, y, r, w, s, z):
+def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b):
     """
     Add all constraints of the taxi-like MILP model to the docplex model.
     """
@@ -206,41 +224,34 @@ def add_taxi_like_constraints_asym(mdl, I, x, y, r, w, s, z):
 
 
     # ------------------------------------------------------------------
-    # 6) Request completion and definition of s_k
-    #     sum_{t ∈ ΔT_k_out} sum_{m ∈ M} (r[k,t-1,m] - r[k,t,m]) = s_k
+    # 6) Request completion and definition of s_k (via b)
     #
-    # If no admissible drop-off times exist for request k, then s_k = 0.
+    #   s_k = 1  se e solo se la richiesta k effettua una discesa finale
+    #             in uno degli istanti ammessi ΔT_k_out.
+    #
+    #   sum_{m∈M} sum_{t ∈ ΔT_k_out} b[k,t,m] = s_k
+    #
+    # Se non esistono tempi di discesa ammissibili per k → s_k = 0.
     # ------------------------------------------------------------------
     for k in K:
-        # All times t where request k is allowed to alight at some node i
-        out_times_k = sorted({t for (kk, i, t) in d_out.keys() if kk == k})     ### <--- It is enough to check ΔT_out_k
+        # Tutti gli istanti in cui la richiesta k può scendere in qualche nodo i
+        out_times_k = sorted({t for (kk, i, t) in d_out.keys() if kk == k})
 
         if not out_times_k:
-            # No feasible drop-off time → the request can never be completed
+            # Nessun tempo di discesa → la richiesta non può mai essere completata
             mdl.add_constraint(s[k] == 0, ctname=f"served_empty_k{k}")
             continue
 
-        terms = []
-        for m in M:
-            for t in out_times_k:
-                # r[k, t, m] esiste solo se (k, t, m) in r
-                if (k, t, m) not in r:
-                    # se non esiste, contribuisce 0 al bilancio (sia r_t che r_{t-1})
-                    continue
-
-                prev_t = t - 1
-                if (k, prev_t, m) in r:
-                    terms.append(r[k, prev_t, m] - r[k, t, m])
-                else:
-                    # nessuna variabile r[k, t-1, m] definita → r[k,t-1,m]=0
-                    terms.append(- r[k, t, m])
-
-        expr = mdl.sum(terms)
-
         mdl.add_constraint(
-            expr == s[k],
+            mdl.sum(
+                b[k, t, m]
+                for m in M
+                for t in out_times_k
+                if (k, t, m) in b
+            ) == s[k],
             ctname=f"served_via_drop_k{k}"
         )
+
 
 
 
@@ -358,41 +369,67 @@ def add_taxi_like_constraints_asym(mdl, I, x, y, r, w, s, z):
 
 
     # ------------------------------------------------------------------
-    # 10) Boarding / Alighting constraints with d_in, d_out
+    # 10) Boarding / Alighting with a,b + coherence of r
     #
-    # Boarding or entry for swap:
-    #   r[k,t,m] - r[k,t-1,m] <=
-    #       sum_i x[m,i,t] d_in[k,i,t] +
-    #       sum_i sum_{m'≠m} w[k,i,t,m',m]
+    # (10.1) Al più un evento (salita o discesa) per (k,t,m):
+    #         a[k,t,m] + b[k,t,m] ≤ 1
     #
-    # Alighting or exit for swap:
-    #   r[k,t,m] - r[k,t-1,m] >=
-    #      - sum_i x[m,i,t] d_out[k,i,t]
-    #      - sum_i sum_{m'≠m} w[k,i,t,m,m']
+    # (10.2) Dinamica di r:
+    #    Per i tempi di k ordinati t^1_k < t^2_k < ... < t^{|ΔT_k|}_k:
     #
-    # con la convenzione:
-    #   se r[k,t-1,m] non è definita (t-1 ∉ ΔT_k), allora r[k,t-1,m] = 0.
+    #    r[k, t^1_k, m] = a[k, t^1_k, m] - b[k, t^1_k, m]
+    #    r[k, t^i_k, m] = r[k, t^{i-1}_k, m] + a[k, t^i_k, m] - b[k, t^i_k, m]
+    #
+    # (10.3) Attivazione di a e b:
+    #
+    #   a[k,t,m] ≤ sum_{i∈N} x[m,i,t] d_in[k,i,t]
+    #              + sum_{i∈Nw} sum_{m'≠m} w[k,i,t,m',m]
+    #
+    #   b[k,t,m] ≤ sum_{i∈N} x[m,i,t] d_out[k,i,t]
+    #              + sum_{i∈Nw} sum_{m'≠m} w[k,i,t,m,m']
     # ------------------------------------------------------------------
+
+    # (10.1) Al più un evento
     for k in K:
-        times_k = DeltaT[k]      # solo istanti dove r[k,t,·] esiste
-        for t in times_k:
+        for t in DeltaT[k]:
             for m in M:
-                # LHS = r[k,t,m] - r[k,t-1,m] se r[k,t-1,m] esiste, altrimenti r[k,t,m]
-                if (k, t, m) not in r:
-                    # per sicurezza (non dovrebbe succedere, visto che t ∈ ΔT_k)
-                    continue
+                mdl.add_constraint(
+                    a[k, t, m] + b[k, t, m] <= 1,
+                    ctname=f"one_event_k{k}_t{t}_m{m}"
+                )
 
-                if (k, t-1, m) in r:
-                    lhs = r[k, t, m] - r[k, t-1, m]
-                else:
-                    lhs = r[k, t, m]
+    # (10.2) Dinamica di r tramite a,b
+    for k in K:
+        times_k = sorted(DeltaT[k])
+        if not times_k:
+            continue
 
-                # RHS salita: sum_i x[m,i,t] * d_in[k,i,t]
+        for m in M:
+            # primo tempo della finestra di k
+            t0_k = times_k[0]
+
+            # r[k,t0_k,m] = a[k,t0_k,m] - b[k,t0_k,m]
+            mdl.add_constraint(
+                r[k, t0_k, m] == a[k, t0_k, m] - b[k, t0_k, m],
+                ctname=f"r_chain_first_k{k}_t{t0_k}_m{m}"
+            )
+
+            # tempi successivi
+            for t_prev, t in zip(times_k[:-1], times_k[1:]):
+                mdl.add_constraint(
+                    r[k, t, m] == r[k, t_prev, m] + a[k, t, m] - b[k, t, m],
+                    ctname=f"r_chain_k{k}_t{t}_m{m}"
+                )
+
+    # (10.3) Attivazione di a (salite o ingressi da scambio)
+    for k in K:
+        for t in DeltaT[k]:
+            for m in M:
                 boarding_terms = []
                 for i in N:
                     if (k, i, t) in d_in:
                         boarding_terms.append(x[m, i, t])
-                # + scambi in ingresso w[k,i,t,m',m]
+
                 swap_in_terms = []
                 for i in Nw:
                     for mp in M:
@@ -402,18 +439,20 @@ def add_taxi_like_constraints_asym(mdl, I, x, y, r, w, s, z):
                             swap_in_terms.append(w[k, i, t, mp, m])
 
                 rhs_up = mdl.sum(boarding_terms) + mdl.sum(swap_in_terms)
-
                 mdl.add_constraint(
-                    lhs <= rhs_up,
-                    ctname=f"boarding_or_swap_in_k{k}_t{t}_m{m}"
+                    a[k, t, m] <= rhs_up,
+                    ctname=f"a_activation_k{k}_t{t}_m{m}"
                 )
 
-                # RHS discesa: - sum_i x[m,i,t] * d_out[k,i,t]
+    # (10.3) Attivazione di b (discese o uscite per scambio)
+    for k in K:
+        for t in DeltaT[k]:
+            for m in M:
                 alight_terms = []
                 for i in N:
                     if (k, i, t) in d_out:
                         alight_terms.append(x[m, i, t])
-                # + scambi in uscita w[k,i,t,m,m']
+
                 swap_out_terms = []
                 for i in Nw:
                     for mp in M:
@@ -422,62 +461,17 @@ def add_taxi_like_constraints_asym(mdl, I, x, y, r, w, s, z):
                         if (k, i, t, m, mp) in w:
                             swap_out_terms.append(w[k, i, t, m, mp])
 
-                rhs_down = - mdl.sum(alight_terms) - mdl.sum(swap_out_terms)
-
+                rhs_down = mdl.sum(alight_terms) + mdl.sum(swap_out_terms)
                 mdl.add_constraint(
-                    lhs >= rhs_down,
-                    ctname=f"alighting_or_swap_out_k{k}_t{t}_m{m}"
+                    b[k, t, m] <= rhs_down,
+                    ctname=f"b_activation_k{k}_t{t}_m{m}"
                 )
 
 
-    # ------------------------------------------------------------------
-    # 11) Symmetry-breaking via module activation z_m
-    #
-    # sum_{i,j,t} y[m,i,j,t] <= |A|*|T| * z_m
-    # z_m <= sum_{i,j,t} y[m,i,j,t]
-    # z_m >= z_{m+1}
-    # ------------------------------------------------------------------
-
-    # Big-M: massimo numero di partenze possibili per modulo
-    Y_bar = len(A) * len(T)
-
-    # (a) Collegamento tra z_m e l'uso delle y
-    for m in M:
-        mdl.add_constraint(
-            mdl.sum(
-                y[m, i, j, t]
-                for (i, j) in A
-                for t in T
-            ) <= Y_bar * z[m],
-            ctname=f"symm_z_upper_m{m}"
-        )
-
-        mdl.add_constraint(
-            z[m] <= mdl.sum(
-                y[m, i, j, t]
-                for (i, j) in A
-                for t in T
-            ),
-            ctname=f"symm_z_lower_m{m}"
-        )
-
-    # (b) Catena di attivazione: z_m >= z_{m+1}
-    # Attenzione: se M non è una lista già ordinata, ordiniamola
-    M_sorted = sorted(M)
-
-    for idx in range(len(M_sorted) - 1):
-        m = M_sorted[idx]
-        m_next = M_sorted[idx + 1]
-
-        mdl.add_constraint(
-            z[m] >= z[m_next],
-            ctname=f"symm_chain_m{m}_mnext{m_next}"
-        )
 
 
 
-
-def add_taxi_like_objective_asym(mdl, I, y, s):
+def add_taxi_like_objective_ab(mdl, I, y, s):
     """
     Add the full taxi-like MILP objective function:
         min ( C_oper + C_uns )
@@ -529,7 +523,7 @@ def add_taxi_like_objective_asym(mdl, I, y, s):
 
 
 
-def create_taxi_like_model_asym(I: Instance):
+def create_taxi_like_model_ab(I: Instance):
     """
     Create:
         - Model()
@@ -541,15 +535,15 @@ def create_taxi_like_model_asym(I: Instance):
     mdl = Model(name="TaxiLike")
 
     # 1) variables
-    x, y, r, w, s, z = create_decision_variables_asym(mdl, I)
+    x, y, r, w, s, a, b = create_decision_variables_ab(mdl, I)
 
     # 2) constraints
-    add_taxi_like_constraints_asym(mdl, I, x, y, r, w, s, z)
+    add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b)
 
     # 3) objective
-    add_taxi_like_objective_asym(mdl, I, y, s)
+    add_taxi_like_objective_ab(mdl, I, y, s)
 
-    return mdl, x, y, r, w, s, z
+    return mdl, x, y, r, w, s, a, b
 
 
 
