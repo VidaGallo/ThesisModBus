@@ -210,7 +210,7 @@ if __name__ == "__main__":
     # ----------------
     ### Base params ###
     # ----------------
-    dt = 7                     # minutes per slot
+    dt = 5                     # minutes per slot
     depot = 0
 
     Q = 10
@@ -219,14 +219,14 @@ if __name__ == "__main__":
 
     q_min = 1                  # min q_k
     q_max = 3                  # max q_k
-    slack_min = 20.0           # minutes of flexibility
+    slack_min = 30.0           # minutes of flexibility
 
     # --------------------------
     ### Grid of experiments  ###
     # --------------------------
     grid_numbers      = [5]     # grid side (number x number)
-    horizons          = [200]            # time horizon in minutes (continuous)
-    num_modules_list  = [3, 5, 10]              # number of modules
+    horizons          = [500]            # time horizon in minutes (continuous)
+    num_modules_list  = [3, 5]              # number of modules
     num_requests_list = [10]         # how many taxi-like requests
     seeds             = [23]              # for reproducibility
 
@@ -276,7 +276,7 @@ if __name__ == "__main__":
     df_results = pd.DataFrame(all_results)
 
     # Where to save the summary (inside results/)
-    summary_path = f"results/summary_experiments_{number}x{number}_h100_asym.csv"
+    summary_path = f"results/summary_experiments_{number}x{number}_ab.csv"
     df_results.to_csv(summary_path, index=False)
 
     print("\n\n\n" + "#"*80)
