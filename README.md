@@ -18,7 +18,7 @@ ThesisModBus/
 ├── requirements.txt  
 ├── .gitignore  
 ├── LICENSE  
-│   
+│  
 |  
 |  
 ├── instances/  
