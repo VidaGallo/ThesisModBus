@@ -37,7 +37,7 @@ import json
 from pathlib import Path
 from typing import Tuple, Dict, List, Set
 
-from .instance import *
+from .instance_def import *
 
 
 
@@ -144,7 +144,8 @@ def load_instance_discrete(
     Q: int,
     c_km: float,
     c_uns_taxi: float,
-    depot: int
+    depot: int,
+    num_Nw: int
 ) -> Instance:
     
     """
@@ -203,4 +204,5 @@ def load_instance_discrete(
         depot=depot,
         dt=dt,
         t_max=t_max,
+        num_Nw=num_Nw
     )

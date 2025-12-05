@@ -100,7 +100,7 @@ def save_model_stats(mdl: Model, output_folder: Path):
 
 
 
-def save_solution_variables(solution, x, y, r, w, s, output_folder):
+def save_solution_variables(solution, x, y, r, L, R, s, a, b, output_folder):
     """
     Save all decision variables that are equal to 1 (or >0.5 threshold)
     into CSV files inside:  output_folder / "variables" / ...
@@ -176,22 +176,39 @@ def save_solution_variables(solution, x, y, r, w, s, output_folder):
 
 
 
-
-
-def save_solution_variables_new(solution, x, y, r, s, z, output_folder: Path):
+def save_solution_variables_flex(
+    solution,
+    output_folder: Path,
+    *,
+    x=None,
+    y=None,
+    r=None,
+    w=None,
+    z=None,
+    s=None,
+    L=None,
+    R=None,
+    a=None,
+    b=None,
+    thr: float = 0.5,
+):
     """
-    Save all decision variables that are equal to 1 (or >0.5 threshold)
-    into CSV files inside:  output_folder / "variables" / ...
+    Save decision variables (only those > thr) into CSV files.
 
-    Creates:
-        variables/x_positions.csv
-        variables/y_movements.csv
-        variables/r_assignments.csv
-        variables/z_exchange_nodes.csv
-        variables/s_served.csv
+    Tutti i dizionari di variabili sono opzionali: se sono None vengono ignorati.
+
+    Parametri tipici:
+        x[(m, i, t)]
+        y[(m, i, j, t)]
+        r[(k, t, m)]
+        w[(k, i, t, m, mp)]
+        z[(k, t, m, i)]
+        s[k]
+        L[(k, i, t, m)]
+        R[(k, i, t, m)]
+        a[(k, t, m)]
+        b[(k, t, m)]
     """
-
-    thr = 0.5  # threshold
 
     # -------------------------
     # Create subfolder: variables/
@@ -202,49 +219,108 @@ def save_solution_variables_new(solution, x, y, r, s, z, output_folder: Path):
     # -------------------------
     # X: module positions
     # -------------------------
-    with (var_folder / "x_positions.csv").open("w") as f:
-        f.write("m,i,t,val\n")
-        for (m, i, t), var in x.items():
-            val = solution.get_value(var)
-            if val > thr:
-                f.write(f"{m},{i},{t},{val}\n")
+    if x is not None:
+        with (var_folder / "x_positions.csv").open("w") as f:
+            f.write("m,i,t,val\n")
+            for (m, i, t), var in x.items():
+                val = solution.get_value(var)
+                if val > thr:
+                    f.write(f"{m},{i},{t},{val}\n")
 
     # -------------------------
     # Y: module movements
     # -------------------------
-    with (var_folder / "y_movements.csv").open("w") as f:
-        f.write("m,i,j,t,val\n")
-        for (m, i, j, t), var in y.items():
-            val = solution.get_value(var)
-            if val > thr:
-                f.write(f"{m},{i},{j},{t},{val}\n")
+    if y is not None:
+        with (var_folder / "y_movements.csv").open("w") as f:
+            f.write("m,i,j,t,val\n")
+            for (m, i, j, t), var in y.items():
+                val = solution.get_value(var)
+                if val > thr:
+                    f.write(f"{m},{i},{j},{t},{val}\n")
 
     # -------------------------
-    # R: request assignments (k on m at time t)
+    # R: request assignments
     # -------------------------
-    with (var_folder / "r_assignments.csv").open("w") as f:
-        f.write("k,t,m,val\n")
-        for (k, t, m), var in r.items():
-            val = solution.get_value(var)
-            if val > thr:
-                f.write(f"{k},{t},{m},{val}\n")
+    if r is not None:
+        with (var_folder / "r_assignments.csv").open("w") as f:
+            f.write("k,t,m,val\n")
+            for (k, t, m), var in r.items():
+                val = solution.get_value(var)
+                if val > thr:
+                    f.write(f"{k},{t},{m},{val}\n")
 
     # -------------------------
-    # Z: request k on module m at exchange node i, time t
-    #     (linearizzazione di r*x sui nodi di scambio Nw)
+    # W: swaps (taxi-like vecchia versione)
     # -------------------------
-    with (var_folder / "z_exchange_nodes.csv").open("w") as f:
-        f.write("k,t,m,i,val\n")
-        for (k, t, m, i), var in z.items():
-            val = solution.get_value(var)
-            if val > thr:
-                f.write(f"{k},{t},{m},{i},{val}\n")
+    if w is not None:
+        with (var_folder / "w_swaps.csv").open("w") as f:
+            f.write("k,i,t,m,mp,val\n")
+            for (k, i, t, m, mp), var in w.items():
+                val = solution.get_value(var)
+                if val > thr:
+                    f.write(f"{k},{i},{t},{m},{mp},{val}\n")
 
     # -------------------------
-    # S: served (s_k)
+    # Z: exchange nodes (linearizzazione r*x sui nodi di scambio)
     # -------------------------
-    with (var_folder / "s_served.csv").open("w") as f:
-        f.write("k,val\n")
-        for k, var in s.items():
-            val = solution.get_value(var)
-            f.write(f"{k},{val}\n")
+    if z is not None:
+        with (var_folder / "z_exchange_nodes.csv").open("w") as f:
+            f.write("k,t,m,i,val\n")
+            for (k, t, m, i), var in z.items():
+                val = solution.get_value(var)
+                if val > thr:
+                    f.write(f"{k},{t},{m},{i},{val}\n")
+
+    # -------------------------
+    # S: served
+    # -------------------------
+    if s is not None:
+        with (var_folder / "s_served.csv").open("w") as f:
+            f.write("k,val\n")
+            for k, var in s.items():
+                val = solution.get_value(var)
+                f.write(f"{k},{val}\n")
+
+    # -------------------------
+    # L: leave (modello Tris)
+    # -------------------------
+    if L is not None:
+        with (var_folder / "L_leave.csv").open("w") as f:
+            f.write("k,i,t,m,val\n")
+            for (k, i, t, m), var in L.items():
+                val = solution.get_value(var)
+                if val > thr:
+                    f.write(f"{k},{i},{t},{m},{val}\n")
+
+    # -------------------------
+    # R: receive (modello Tris)
+    # -------------------------
+    if R is not None:
+        with (var_folder / "R_receive.csv").open("w") as f:
+            f.write("k,i,t,m,val\n")
+            for (k, i, t, m), var in R.items():
+                val = solution.get_value(var)
+                if val > thr:
+                    f.write(f"{k},{i},{t},{m},{val}\n")
+
+    # -------------------------
+    # A: boarding events
+    # -------------------------
+    if a is not None:
+        with (var_folder / "a_boarding.csv").open("w") as f:
+            f.write("k,t,m,val\n")
+            for (k, t, m), var in a.items():
+                val = solution.get_value(var)
+                if val > thr:
+                    f.write(f"{k},{t},{m},{val}\n")
+
+    # -------------------------
+    # B: alighting events
+    # -------------------------
+    if b is not None:
+        with (var_folder / "b_alighting.csv").open("w") as f:
+            f.write("k,t,m,val\n")
+            for (k, t, m), var in b.items():
+                val = solution.get_value(var)
+                if val > thr:
+                    f.write(f"{k},{t},{m},{val}\n")

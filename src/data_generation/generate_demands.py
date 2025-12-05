@@ -58,6 +58,7 @@ def generate_taxi_requests(
     q_max: int = 3,
     slack_min: float = 20.0,
     time_horizon_max: float = 600.0,   # 10h
+    depot: int = 0,
 ) -> list:
     """
     Generate taxi-like requests with continuous time fields.
@@ -104,11 +105,15 @@ def generate_taxi_requests(
 
 
 
-            ##### Shortest-path travel time (minutes): #####
+            ##### Shortest-path travel times (minutes): #####
             try:
+                # tempo tra origin e destination (tau_sp)
                 tau_sp = compute_shortest_path_time(G, origin, dest)
+                
+                # tempo dal depot all'origine (tau_depot_origin)
+                tau_depot_origin = compute_shortest_path_time(G, depot, origin)
             except nx.NetworkXNoPath:
-                # if doesn't exist try again with the next while
+                # se non esiste percorso, riprova con un'altra coppia
                 continue
 
 
@@ -117,12 +122,16 @@ def generate_taxi_requests(
             #  desired_dep + tau_sp + slack_min <= time_horizon_max
             latest_departure = time_horizon_max - (tau_sp + slack_min)
 
-            if latest_departure <= 0:
-                # if the time windows are > t_max, continue with the next while
+            # Si vuole desired_dep >= tau_depot_origin
+            if latest_departure <= tau_depot_origin:
+                # non esiste un intervallo valido per desired_dep
                 continue
 
-            desired_dep = random.uniform(0.0, latest_departure)
+            # Start sampling from first feasable moment
+            desired_dep = random.uniform(tau_depot_origin, latest_departure)
+
             desired_arr = desired_dep + tau_sp
+
 
 
             ##### Time windows #####

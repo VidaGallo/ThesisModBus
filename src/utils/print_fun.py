@@ -5,7 +5,7 @@ print_data.py
  - print of the Results
 """
 
-from .instance import Instance
+from .instance_def import Instance
 import json
 from pathlib import Path
 from typing import Dict, Tuple

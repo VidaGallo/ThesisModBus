@@ -115,6 +115,7 @@ def generate_all_data_asym(
     q_min: int,
     q_max: int,
     slack_min: float,
+    depot: int
 ):
     """
     Generate continuous network + continuous requests,
@@ -155,6 +156,7 @@ def generate_all_data_asym(
         q_max=q_max,
         slack_min=slack_min,
         time_horizon_max=float(horizon),
+        depot=depot
     )
 
     save_requests(requests_cont, taxi_requests)

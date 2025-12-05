@@ -71,17 +71,28 @@ class Instance:
     depot: int = 0
 
     ### --- internal nodes ---
-    Nw: Set[Node] = field(init=False)
+    num_Nw: int = 0                   # <-- To choose
+    Nw: Set[Node] = field(init=False) # Defined after the __init__
 
     def __post_init__(self):
-        """Automatic computation of Nw"""
+        """Compute Nw as the 'num_Nw' nodes with highest degree."""
+        # Compute undirected degree
         degree = {i: 0 for i in self.N}
         for (i, j) in self.A:
             degree[i] += 1
-            degree[j] += 1   # grado non orientato
+            degree[j] += 1
 
-        self.Nw = {i for i, deg in degree.items() if deg >= 10}    #<--  if we want 4 => 8=4*2
+        # Order nodes by degree (descending)
+        nodes_sorted = sorted(degree.items(), key=lambda x: x[1], reverse=True)
+
+        # Take first num_Nw nodes
+        if self.num_Nw > 0:
+            self.Nw = {node for node, deg in nodes_sorted[:self.num_Nw]}
+        else:
+            self.Nw = set()
     
+
+
     @property  # attribute "read-only"
     def num_nodes(self) -> int:
         return len(self.N)
