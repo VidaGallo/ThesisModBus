@@ -18,7 +18,7 @@ from utils.instance_def import Instance
 
 
 
-def create_decision_variables_ab_LR(mdl: Model, I: Instance):
+def create_decision_variables_ab_LR_relax(mdl: Model, I: Instance):
     """
     Create all MILP decision variables for the taxi-like model.
     """
@@ -74,10 +74,13 @@ def create_decision_variables_ab_LR(mdl: Model, I: Instance):
     )
 
     # s[k]
-    s = mdl.binary_var_dict(
-        keys=[k for k in I.K],
-        name="s"
+    s = mdl.continuous_var_dict(
+    keys=[k for k in I.K],
+    lb=0,
+    ub=1,
+    name="s"
     )
+
 
     
     # a[k,t,m]
@@ -110,7 +113,7 @@ def create_decision_variables_ab_LR(mdl: Model, I: Instance):
 
 
 
-def add_taxi_like_constraints_ab_LR(mdl, I, x, y, r, L, R, s, a, b):
+def add_taxi_like_constraints_ab_LR_relax(mdl, I, x, y, r, L, R, s, a, b):
     """
     Add all constraints of the taxi-like MILP model to the docplex model.
     """
@@ -509,7 +512,7 @@ def add_taxi_like_constraints_ab_LR(mdl, I, x, y, r, L, R, s, a, b):
 
 
 
-def add_taxi_like_objective_ab_LR(mdl, I, y, s):
+def add_taxi_like_objective_ab_LR_relax(mdl, I, y, s):
     """
     Add the full taxi-like MILP objective function:
         min ( C_oper + C_uns )
@@ -561,7 +564,7 @@ def add_taxi_like_objective_ab_LR(mdl, I, y, s):
 
 
 
-def create_taxi_like_model_ab_LR(I: Instance):
+def create_taxi_like_model_ab_LR_relax(I: Instance):
     """
     Create:
         - Model()
@@ -573,13 +576,13 @@ def create_taxi_like_model_ab_LR(I: Instance):
     mdl = Model(name="TaxiLike")
 
     # 1) variables
-    x, y, r, L, R, s, a, b = create_decision_variables_ab_LR(mdl, I)
+    x, y, r, L, R, s, a, b = create_decision_variables_ab_LR_relax(mdl, I)
 
     # 2) constraints
-    add_taxi_like_constraints_ab_LR(mdl, I, x, y, r, L, R, s, a, b)
+    add_taxi_like_constraints_ab_LR_relax(mdl, I, x, y, r, L, R, s, a, b)
 
     # 3) objective
-    add_taxi_like_objective_ab_LR(mdl, I, y, s)
+    add_taxi_like_objective_ab_LR_relax(mdl, I, y, s)
 
     return mdl, x, y, r, L, R, s, a, b
 

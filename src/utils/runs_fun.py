@@ -15,6 +15,10 @@ from models.deterministic.model_taxi_like_LR import *
 from models.deterministic.model_taxi_like_ab import *
 from models.deterministic.model_taxi_like_ab_LR import *
 
+from models.deterministic.model_taxi_like_relax import *
+from models.deterministic.model_taxi_like_LR_relax import *
+from models.deterministic.model_taxi_like_ab_relax import *
+from models.deterministic.model_taxi_like_ab_LR_relax import *
 
 
 
@@ -124,6 +128,18 @@ def run_single_model(
         L = R = None
     elif model_name == "ab_LR":
         model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR(instance)
+        w = None
+    elif model_name == "base_relax":
+        model, x, y, r, w, s = create_taxi_like_model_relax(instance)
+        L = R = a = b = None
+    elif model_name == "LR_relax":
+        model, x, y, r, L, R, s = create_taxi_like_model_LR_relax(instance)
+        a = b = w = None
+    elif model_name == "ab_relax":
+        model, x, y, r, w, s, a, b = create_taxi_like_model_ab_relax(instance)
+        L = R = None
+    elif model_name == "ab_LR_relax":
+        model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR_relax(instance)
         w = None
     else:
         raise ValueError(f"Unknown model_name: {model_name}")

@@ -367,8 +367,8 @@ def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b):
     
 
 
-    # ------------------------------------------------------------------
-    # 10) Boarding / Alighting with a,b + coherence of r
+     # ------------------------------------------------------------------
+    # 10) Boarding / Alighting con a,b + coerenza di r 
     #
     # (10.1) Al più un evento (salita o discesa) per (k,t,m):
     #         a[k,t,m] + b[k,t,m] ≤ 1
@@ -378,25 +378,28 @@ def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b):
     #
     #    r[k, t^1_k, m] = a[k, t^1_k, m] - b[k, t^1_k, m]
     #    r[k, t^i_k, m] = r[k, t^{i-1}_k, m] + a[k, t^i_k, m] - b[k, t^i_k, m]
+    #                     - sum_{i∈Nw} sum_{m'≠m} w[k,i,t^i_k,m,m']
+    #                     + sum_{i∈Nw} sum_{m'≠m} w[k,i,t^i_k,m',m]
     #
-    # (10.3) Attivazione di a e b:
+    # (10.3) Attivazione di a e b (solo da terra):
     #
     #   a[k,t,m] ≤ sum_{i∈N} x[m,i,t] d_in[k,i,t]
-    #              + sum_{i∈Nw} sum_{m'≠m} w[k,i,t,m',m]
-    #
     #   b[k,t,m] ≤ sum_{i∈N} x[m,i,t] d_out[k,i,t]
-    #              + sum_{i∈Nw} sum_{m'≠m} w[k,i,t,m,m']
+    #
+    # (10.4) Coerenza con lo stato precedente:
+    #
+    #   a[k,t,m] ≤ 1 - r[k,t_prev,m]
+    #   b[k,t,m] ≤     r[k,t_prev,m]
     # ------------------------------------------------------------------
 
-    # (10.1) Al più un evento
-    for k in K:
-        for t in DeltaT[k]:
-            for m in M:
-                mdl.add_constraint(
-                    a[k, t, m] + b[k, t, m] <= 1,
-                    ctname=f"one_event_k{k}_t{t}_m{m}"
-                )
-
+    # (10.1) Al più un evento per (k,t,m)
+    #for k in K:
+    #    for t in DeltaT[k]:
+    #        for m in M:
+    #            mdl.add_constraint(
+    #                a[k, t, m] + b[k, t, m] <= 1,
+    #                ctname=f"one_event_k{k}_t{t}_m{m}"
+    #            )
 
     # (10.1bis) Al più UNA salita e UNA discesa per richiesta k
     for k in K:
@@ -420,8 +423,7 @@ def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b):
             ctname=f"max_one_alighting_k{k}"
         )
 
-
-    # (10.2) Dinamica di r tramite a,b
+    # (10.2) Dinamica di r tramite a,b e w
     for k in K:
         times_k = sorted(DeltaT[k])
         if not times_k:
@@ -431,7 +433,7 @@ def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b):
             # primo tempo della finestra di k
             t0_k = times_k[0]
 
-            # r[k,t0_k,m] = a[k,t0_k,m] - b[k,t0_k,m]
+            # Al primo istante della finestra non consideriamo scambi e non si ha r per t-1:
             mdl.add_constraint(
                 r[k, t0_k, m] == a[k, t0_k, m] - b[k, t0_k, m],
                 ctname=f"r_chain_first_k{k}_t{t0_k}_m{m}"
@@ -439,57 +441,79 @@ def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b):
 
             # tempi successivi
             for t_prev, t in zip(times_k[:-1], times_k[1:]):
+
+                # scambio "in uscita" dal modulo m al tempo t
+                swap_out = mdl.sum(
+                    w[k, i, t, m, mp]
+                    for i in Nw
+                    for mp in M
+                    if mp != m and (k, i, t, m, mp) in w
+                )
+
+                # scambio "in entrata" sul modulo m al tempo t
+                swap_in = mdl.sum(
+                    w[k, i, t, mp, m]
+                    for i in Nw
+                    for mp in M
+                    if mp != m and (k, i, t, mp, m) in w
+                )
+
                 mdl.add_constraint(
-                    r[k, t, m] == r[k, t_prev, m] + a[k, t, m] - b[k, t, m],
+                    r[k, t, m] ==
+                    r[k, t_prev, m] + a[k, t, m] - b[k, t, m]
+                    - swap_out + swap_in,
                     ctname=f"r_chain_k{k}_t{t}_m{m}"
                 )
 
-    # (10.3) Attivazione di a (salite o ingressi da scambio)
+    # (10.3) Attivazione di a (solo salite da terra)
     for k in K:
         for t in DeltaT[k]:
             for m in M:
-                boarding_terms = []
-                for i in N:
-                    if (k, i, t) in d_in:
-                        boarding_terms.append(x[m, i, t])
+                boarding_terms = [
+                    x[m, i, t]
+                    for i in N
+                    if (k, i, t) in d_in
+                ]
 
-                swap_in_terms = []
-                for i in Nw:
-                    for mp in M:
-                        if mp == m:
-                            continue
-                        if (k, i, t, mp, m) in w:
-                            swap_in_terms.append(w[k, i, t, mp, m])
-
-                rhs_up = mdl.sum(boarding_terms) + mdl.sum(swap_in_terms)
+                rhs_up = mdl.sum(boarding_terms)
                 mdl.add_constraint(
                     a[k, t, m] <= rhs_up,
                     ctname=f"a_activation_k{k}_t{t}_m{m}"
                 )
 
-    # (10.3) Attivazione di b (discese o uscite per scambio)
+    # (10.3) Attivazione di b (solo discese a terra)
     for k in K:
         for t in DeltaT[k]:
             for m in M:
-                alight_terms = []
-                for i in N:
-                    if (k, i, t) in d_out:
-                        alight_terms.append(x[m, i, t])
+                alight_terms = [
+                    x[m, i, t]
+                    for i in N
+                    if (k, i, t) in d_out
+                ]
 
-                swap_out_terms = []
-                for i in Nw:
-                    for mp in M:
-                        if mp == m:
-                            continue
-                        if (k, i, t, m, mp) in w:
-                            swap_out_terms.append(w[k, i, t, m, mp])
-
-                rhs_down = mdl.sum(alight_terms) + mdl.sum(swap_out_terms)
+                rhs_down = mdl.sum(alight_terms)
                 mdl.add_constraint(
                     b[k, t, m] <= rhs_down,
                     ctname=f"b_activation_k{k}_t{t}_m{m}"
                 )
 
+    # (10.4) Coerenza con lo stato precedente: a/b compatibili con r_{t_prev}
+    for k in K:
+        times_k = sorted(DeltaT[k])
+        if not times_k:
+            continue
+
+        for m in M:
+            # imponiamo i vincoli solo a partire dal secondo istante della finestra
+            for t_prev, t in zip(times_k[:-1], times_k[1:]):
+                mdl.add_constraint(
+                    a[k, t, m] <= 1 - r[k, t_prev, m],
+                    ctname=f"a_prev_state_k{k}_t{t}_m{m}"
+                )
+                mdl.add_constraint(
+                    b[k, t, m] <= r[k, t_prev, m],
+                    ctname=f"b_prev_state_k{k}_t{t}_m{m}"
+                )
 
 
 

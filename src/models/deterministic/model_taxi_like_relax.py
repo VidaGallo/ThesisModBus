@@ -18,7 +18,7 @@ from utils.instance_def import Instance
 
 
 
-def create_decision_variables(mdl: Model, I: Instance):
+def create_decision_variables_relax(mdl: Model, I: Instance):
     """
     Create all MILP decision variables for the taxi-like model.
     """
@@ -37,13 +37,16 @@ def create_decision_variables(mdl: Model, I: Instance):
     )
 
     # r[k,t,m], only for t ∈ ΔT_k
-    r = mdl.binary_var_dict(         # <--- continua
+    r = mdl.continuous_var_dict(
         keys=[(k, t, m)
-              for k in I.K
-              for t in I.DeltaT[k]
-              for m in I.M],
+            for k in I.K
+            for t in I.DeltaT[k]
+            for m in I.M],
+        lb=0,
+        ub=1,
         name="r"
     )
+
 
     print("Nw:", I.Nw)
     # w[k,i,t,m,mp] only for:
@@ -64,10 +67,13 @@ def create_decision_variables(mdl: Model, I: Instance):
     )
 
     # s[k]
-    s = mdl.binary_var_dict(         # <--- continua
-        keys=[k for k in I.K],
-        name="s"
+    s = mdl.continuous_var_dict(
+    keys=[k for k in I.K],
+    lb=0,
+    ub=1,
+    name="s"
     )
+
 
 
     return x, y, r, w, s
@@ -78,7 +84,7 @@ def create_decision_variables(mdl: Model, I: Instance):
 
 
 
-def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
+def add_taxi_like_constraints_relax(mdl, I, x, y, r, w, s):
     """
     Add all constraints of the taxi-like MILP model to the docplex model.
     """
@@ -427,7 +433,7 @@ def add_taxi_like_constraints(mdl, I, x, y, r, w, s):
 
 
 
-def add_taxi_like_objective(mdl, I, y, s):
+def add_taxi_like_objective_relax(mdl, I, y, s):
     """
     Add the full taxi-like MILP objective function:
         min ( C_oper + C_uns )
@@ -467,7 +473,7 @@ def add_taxi_like_objective(mdl, I, y, s):
 
 
 
-def create_taxi_like_model(I: Instance):
+def create_taxi_like_model_relax(I: Instance):
     """
     Create:
         - Model()
@@ -479,13 +485,13 @@ def create_taxi_like_model(I: Instance):
     mdl = Model(name="TaxiLike")
 
     # 1) variables
-    x, y, r, w, s = create_decision_variables(mdl, I)
+    x, y, r, w, s = create_decision_variables_relax(mdl, I)
 
     # 2) constraints
-    add_taxi_like_constraints(mdl, I, x, y, r, w, s)
+    add_taxi_like_constraints_relax(mdl, I, x, y, r, w, s)
 
     # 3) objective
-    add_taxi_like_objective(mdl, I, y, s)
+    add_taxi_like_objective_relax(mdl, I, y, s)
 
     return mdl, x, y, r, w, s
 

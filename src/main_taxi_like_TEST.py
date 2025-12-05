@@ -13,6 +13,7 @@ if __name__ == "__main__":
     # ----------------
     # Base params 
     # ----------------
+    horizon       = 120    # minuti
     dt = 5
     depot = 0
 
@@ -23,18 +24,17 @@ if __name__ == "__main__":
     num_Nw = 2     # n°nodi che permettono lo scambio
 
     q_min = 1
-    q_max = 3
+    q_max = 5
     slack_min = 30.0
 
     # Parametri SPECIFICI
-    number        = 4      # lato griglia
-    horizon       = 60    # minuti
+    number        = 3      # lato griglia
     num_modules   = 2
     num_requests  = 10
     seed          = 23
 
     # I quattro modelli da confrontare
-    model_names = ["base", "LR" , "ab", "ab_LR"]
+    model_names = ["base", "LR", "ab",  "ab_LR"]    # ["base", "base_relax", "LR", "LR_relax" , "ab", "ab_relax", "ab_LR", "ab_LR_relax"]
 
     all_results = []
     exp_id = f"n{number}_h{horizon}_m{num_modules}_r{num_requests}"
