@@ -29,7 +29,14 @@ from pathlib import Path
 import math
 import random
 
-random.seed(23)
+
+
+# seed
+import random
+import numpy as np
+seed = 23
+random.seed(seed)
+np.random.seed(seed)
 
 
 

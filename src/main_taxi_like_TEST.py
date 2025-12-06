@@ -4,6 +4,12 @@ import pandas as pd
 from pathlib import Path
 
 
+# seed
+import random
+import numpy as np
+seed = 23
+random.seed(seed)
+np.random.seed(seed)
 
 
 
@@ -13,7 +19,7 @@ if __name__ == "__main__":
     # ----------------
     # Base params 
     # ----------------
-    horizon       = 120    # minuti
+    horizon       = 60    # minuti
     dt = 5
     depot = 0
 
@@ -21,7 +27,7 @@ if __name__ == "__main__":
     c_km = 1.0
     c_uns_taxi = 100
 
-    num_Nw = 2     # n°nodi che permettono lo scambio
+    num_Nw = 6     # n°nodi che permettono lo scambio
 
     q_min = 1
     q_max = 5
@@ -31,7 +37,7 @@ if __name__ == "__main__":
     number        = 3      # lato griglia
     num_modules   = 2
     num_requests  = 10
-    seed          = 23
+    
 
     # I quattro modelli da confrontare
     model_names = ["base", "LR", "ab",  "ab_LR"]    # ["base", "base_relax", "LR", "LR_relax" , "ab", "ab_relax", "ab_LR", "ab_LR_relax"]

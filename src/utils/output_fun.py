@@ -14,6 +14,13 @@ These utilities help keep optimization experiments organized and reproducible.
 from pathlib import Path
 from docplex.mp.model import Model
 
+# seed
+import random
+import numpy as np
+seed = 23
+random.seed(seed)
+np.random.seed(seed)
+
 
 def build_output_folder(base_dir: str, network_path: str, t_max: int, dt: int):
     """

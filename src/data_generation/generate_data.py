@@ -26,7 +26,12 @@ from .generate_demands import *
 from .time_discretization import *
 import random
 
-random.seed(23)
+# seed
+import random
+import numpy as np
+seed = 23
+random.seed(seed)
+np.random.seed(seed)
 
 
 def generate_all_data(

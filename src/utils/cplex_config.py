@@ -1,5 +1,15 @@
 from docplex.mp.model import Model
 
+
+# seed
+import random
+import numpy as np
+seed = 23
+random.seed(seed)
+np.random.seed(seed)
+
+
+
 def configure_cplex(
     mdl: Model,
     time_limit: float = 36_000,     # seconds

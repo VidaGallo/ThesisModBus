@@ -17,6 +17,13 @@ or docplex).
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Set
 
+# seed
+import random
+import numpy as np
+seed = 23
+random.seed(seed)
+np.random.seed(seed)
+
 
 Node = int
 Module = int

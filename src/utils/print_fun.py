@@ -12,7 +12,12 @@ from typing import Dict, Tuple
 import matplotlib.pyplot as plt
 
 
-
+# seed
+import random
+import numpy as np
+seed = 23
+random.seed(seed)
+np.random.seed(seed)
 
 
 def print_instance_summary(inst: Instance):

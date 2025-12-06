@@ -7,8 +7,6 @@ from utils.output_fun import *
 from data_generation.generate_data import *
 
 import time
-import random
-import numpy as np
 
 from models.deterministic.model_taxi_like import *
 from models.deterministic.model_taxi_like_LR import *
@@ -19,6 +17,14 @@ from models.deterministic.model_taxi_like_relax import *
 from models.deterministic.model_taxi_like_LR_relax import *
 from models.deterministic.model_taxi_like_ab_relax import *
 from models.deterministic.model_taxi_like_ab_LR_relax import *
+
+
+# seed
+import random
+import numpy as np
+seed = 23
+random.seed(seed)
+np.random.seed(seed)
 
 
 

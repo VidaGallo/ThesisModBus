@@ -14,6 +14,12 @@ from utils.instance_def import Instance
 
 
 
+# seed
+import random
+import numpy as np
+seed = 23
+random.seed(seed)
+np.random.seed(seed)
 
 
 

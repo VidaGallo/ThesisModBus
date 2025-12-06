@@ -26,7 +26,14 @@ import random
 import osmnx as ox
 import networkx as nx
 
-random.seed(23)
+
+# seed
+import random
+import numpy as np
+seed = 23
+random.seed(seed)
+np.random.seed(seed)
+
 
 
 #################
