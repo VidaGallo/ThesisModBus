@@ -19,28 +19,29 @@ if __name__ == "__main__":
     # ----------------
     # Base params 
     # ----------------
-    horizon       = 60    # minuti
+    horizon = 60    # minuti
     dt = 5
     depot = 0
 
     Q = 10
     c_km = 1.0
     c_uns_taxi = 100
+    g_plat = None    # or None
 
-    num_Nw = 6     # n°nodi che permettono lo scambio
+    num_Nw = 5     # n°nodi che permettono lo scambio
 
     q_min = 1
-    q_max = 5
-    slack_min = 30.0
+    q_max = 10
+    slack_min = 20.0
 
     # Parametri SPECIFICI
-    number        = 3      # lato griglia
-    num_modules   = 2
-    num_requests  = 10
+    number        = 5      # lato griglia
+    num_modules   = 6
+    num_requests  = 20
     
 
     # I quattro modelli da confrontare
-    model_names = ["base", "LR", "ab",  "ab_LR"]    # ["base", "base_relax", "LR", "LR_relax" , "ab", "ab_relax", "ab_LR", "ab_LR_relax"]
+    model_names = ["ab",  "ab_LR"]    # ["base", "base_relax", "LR", "LR_relax" , "ab", "ab_relax", "ab_plat", "ab_LR", "ab_LR_relax", "ab_LR_plat"]
 
     all_results = []
     exp_id = f"n{number}_h{horizon}_m{num_modules}_r{num_requests}"
@@ -62,6 +63,7 @@ if __name__ == "__main__":
         Q=Q,
         c_km=c_km,
         c_uns_taxi=c_uns_taxi,
+        g_plat=g_plat,
         num_requests=num_requests,
         q_min=q_min,
         q_max=q_max,
@@ -98,6 +100,7 @@ if __name__ == "__main__":
             Q=Q,
             c_km=c_km,
             c_uns_taxi=c_uns_taxi,
+            g_plat=g_plat,
             num_requests=num_requests,
             q_min=q_min,
             q_max=q_max,

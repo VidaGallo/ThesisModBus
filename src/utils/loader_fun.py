@@ -150,6 +150,7 @@ def load_instance_discrete(
     Q: int,
     c_km: float,
     c_uns_taxi: float,
+    g_plat: float,
     depot: int,
     num_Nw: int
 ) -> Instance:
@@ -167,6 +168,7 @@ def load_instance_discrete(
     Q : int              # module capacity
     c_km : float         # cost per km
     c_uns_taxi : float   # unserved demand penalty
+    g_plat: float        # reward for platooning
     depot: int           # depot node
     """
 
@@ -197,6 +199,7 @@ def load_instance_discrete(
         Q=Q,
         c_km=c_km,
         c_uns_taxi=c_uns_taxi,
+        g_plat=g_plat,
         gamma=gamma,
         tau_arc=tau_arc,
         q=q,

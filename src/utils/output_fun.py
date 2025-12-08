@@ -107,7 +107,7 @@ def save_model_stats(mdl: Model, output_folder: Path):
 
 
 
-def save_solution_variables(solution, x, y, r, L, R, s, a, b, output_folder):
+def save_solution_variables(solution, x, y, r, w, s, output_folder):
     """
     Save all decision variables that are equal to 1 (or >0.5 threshold)
     into CSV files inside:  output_folder / "variables" / ...
@@ -197,6 +197,7 @@ def save_solution_variables_flex(
     R=None,
     a=None,
     b=None,
+    h=None,
     thr: float = 0.5,
 ):
     """
@@ -215,6 +216,7 @@ def save_solution_variables_flex(
         R[(k, i, t, m)]
         a[(k, t, m)]
         b[(k, t, m)]
+        h[(i,j,t)]
     """
 
     # -------------------------
@@ -331,3 +333,14 @@ def save_solution_variables_flex(
                 val = solution.get_value(var)
                 if val > thr:
                     f.write(f"{k},{t},{m},{val}\n")
+
+    # -------------------------
+    # H: aggregated arc flows
+    # -------------------------
+    if h is not None:
+        with (var_folder / "h_arc_flows.csv").open("w") as f:
+            f.write("i,j,t,val\n")
+            for (i, j, t), var in h.items():
+                val = solution.get_value(var)
+                if val > thr:
+                    f.write(f"{i},{j},{t},{val}\n")

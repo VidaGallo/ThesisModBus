@@ -18,6 +18,9 @@ from models.deterministic.model_taxi_like_LR_relax import *
 from models.deterministic.model_taxi_like_ab_relax import *
 from models.deterministic.model_taxi_like_ab_LR_relax import *
 
+from models.deterministic.model_taxi_like_ab_plat import *
+from models.deterministic.model_taxi_like_ab_LR_plat import *
+
 
 # seed
 import random
@@ -36,6 +39,7 @@ def build_instance_and_paths(
     Q: int,
     c_km: float,
     c_uns_taxi: float,
+    g_plat: float,
     num_requests: int,
     q_min: int,
     q_max: int,
@@ -72,6 +76,7 @@ def build_instance_and_paths(
         Q=Q,
         c_km=c_km,
         c_uns_taxi=c_uns_taxi,
+        g_plat=g_plat,
         depot=depot,
         num_Nw = num_Nw     # First N by degree
     )
@@ -93,6 +98,7 @@ def run_single_model(
     Q: int,
     c_km: float,
     c_uns_taxi: float,
+    g_plat: float,
     num_requests: int,
     q_min: int,
     q_max: int,
@@ -103,9 +109,7 @@ def run_single_model(
     base_output_folder,
 ) -> dict:
     """
-    Costruisce e risolve UNO dei 4 modelli su una stessa Instance.
-
-    model_name ∈ {"base", "LR", "ab", "ab_LR"}.
+    Costruisce e risolve UNO dei modelli su una stessa Instance.
     """
 
     # Sottocartella specifica per questo modello
@@ -122,31 +126,28 @@ def run_single_model(
     # ----------------
     t_start_total = time.perf_counter()
 
+    x = y = r = w = L = R = s = a = b = h = None
 
     if model_name == "base":
         model, x, y, r, w, s = create_taxi_like_model(instance)
-        L = R = a = b = None
     elif model_name == "LR":
         model, x, y, r, L, R, s = create_taxi_like_model_LR(instance)
-        a = b = w = None
     elif model_name == "ab":
         model, x, y, r, w, s, a, b = create_taxi_like_model_ab(instance)
-        L = R = None
     elif model_name == "ab_LR":
         model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR(instance)
-        w = None
     elif model_name == "base_relax":
         model, x, y, r, w, s = create_taxi_like_model_relax(instance)
-        L = R = a = b = None
     elif model_name == "LR_relax":
         model, x, y, r, L, R, s = create_taxi_like_model_LR_relax(instance)
-        a = b = w = None
     elif model_name == "ab_relax":
         model, x, y, r, w, s, a, b = create_taxi_like_model_ab_relax(instance)
-        L = R = None
     elif model_name == "ab_LR_relax":
         model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR_relax(instance)
-        w = None
+    elif model_name == "ab_plat":
+        model, x, y, r, w, s, a, b, h = create_taxi_like_model_ab_plat(instance)
+    elif model_name == "ab_LR_plat":
+        model, x, y, r, L, R, s, a, b, h = create_taxi_like_model_ab_LR_plat(instance)
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
 
@@ -190,6 +191,7 @@ def run_single_model(
                 R=R,
                 a=a,
                 b=b,
+                h=h
             )
         except TypeError:
             pass

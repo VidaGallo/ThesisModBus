@@ -46,6 +46,7 @@ class Instance:
     Q: int                    # module capacity
     c_km: float               # cost per km
     c_uns_taxi: float         # penalty cost for unserved taxi-like demand
+    g_plat: float             # reward for having a platoon (to subtract to the c_op)
 
 
     ### --- network-related parameters ---
