@@ -19,7 +19,7 @@ if __name__ == "__main__":
     # ----------------
     # Base params 
     # ----------------
-    horizon = 60    # minuti
+    horizon =60    # minuti
     dt = 5
     depot = 0
 
@@ -126,7 +126,7 @@ if __name__ == "__main__":
         f"K{num_requests}_"
         f"Nw{num_Nw}_4models.csv"
     )
-    summary_path = Path("results") / summary_name
+    summary_path = Path("results/GRID/summary") / summary_name
 
     df_results.to_csv(summary_path, index=False)
 

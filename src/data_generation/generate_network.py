@@ -7,9 +7,6 @@ Supports two modes:
 
 1. GRID network:
    - Builds a side × side grid
-   - Nodes = intersections, edges = adjacent links
-   - Each edge includes distance γ(i,j) and travel time τ(i,j)
-   - Saved as `grid_network.json`
 
 2. CITY network (optional):
    - Loaded from OSM and normalized to the same JSON structure
@@ -26,6 +23,7 @@ import matplotlib.pyplot as plt
 import random
 import osmnx as ox
 import networkx as nx
+import os
 
 
 # seed
@@ -37,22 +35,27 @@ np.random.seed(seed)
 
 
 
+def save_network_json(network_dict: dict, output_dir: str, filename: str = "network.json") -> None:
+    """
+    Save a network dictionary to a JSON file.
+    """
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    out_path = out_dir / filename
+
+    with out_path.open("w", encoding="utf-8") as f:
+        json.dump(network_dict, f, indent=2)
+
+    #print(f"[INFO] Saved network to: {out_path}")
+
+
+
+
+
 #################
 # GRID GENERATOR:
 #################
-"""
-Creates a GRID network (side × side) and saves it as `grid_network.json`
-under the given output directory.
-
-Nodes:
-    id      : integer
-    row,col : grid coordinates
-
-Edges:
-    u, v    : tail and head node id
-    length  : distance γ(i,j)
-    time    : travel time τ(i,j)
-"""
 
 
 def generate_grid_network(
@@ -127,10 +130,6 @@ def generate_grid_network(
         "speed_kmh": float(speed_kmh),
     }
     return network_dict
-
-
-
-
 
 
 
@@ -227,37 +226,74 @@ def generate_grid_network_asym(
 
 
 
+
+
 ####################
 # NETWORK GENERATOR:
 ####################
-"""
-Downloads or loads a real city road network (via OSMnx) and converts it into
-a unified JSON format compatible with the optimization model.
+def plot_city_suburb_network(
+    osm_graph,
+    network_dict: dict,
+    place: str,
+    output_dir: str,
+    filename: str = "torino_suburbs.png",
+    title_suffix: str = "",
+) -> None:
+    """
+    Plot a macro city network (suburbs as nodes, macro edges on top of OSM graph).
+    """
 
-Optionally applies graph reduction:
-    - intersection consolidation (merge nearby nodes)
-    - geometric simplification (remove intermediary shape points)
-    - centrality-based filtering (keep only most important nodes)
+    plt.switch_backend("Agg")
 
-Nodes:
-    id        : unique identifier from OSM
-    x, y      : geographic coordinates (longitude/latitude or projected coords)
+    # Base OSM background
+    fig, ax = ox.plot_graph(osm_graph, show=False, close=False, bgcolor="white")
 
-Edges:
-    u, v      : tail and head node id
-    length_km : physical distance of the road segment (γ(i,j))
-    time_min  : travel time (τ(i,j)) computed from distance and speed
-    speed_kmh : speed assigned to the segment (OSM-based or default)
+    # Build mapping id -> (lon, lat)
+    nodes = network_dict["nodes"]
+    edges = network_dict["edges"]
 
-Notes:
-    - Length is extracted from the road data (meters converted to km).
-    - Speed is obtained from OSM attributes; if missing, a default speed is used.
-    - Travel time is computed as:
-            time_min = (length_km / speed_kmh) * 60
-    - If reduction is enabled, intersections within a tolerance radius
-      are merged, unnecessary nodes are removed, and (optionally) only
-      the most central nodes are kept.
-"""
+    id_to_coord = {
+        n["id"]: (n["lon"], n["lat"])
+        for n in nodes
+    }
+
+    # Plot macro edges
+    for e in edges:
+        u = e["u"]
+        v = e["v"]
+        if u not in id_to_coord or v not in id_to_coord:
+            continue
+
+        lon_u, lat_u = id_to_coord[u]
+        lon_v, lat_v = id_to_coord[v]
+
+        ax.plot(
+            [lon_u, lon_v],
+            [lat_u, lat_v],
+            linewidth=0.8,
+            alpha=0.5,
+        )
+
+    # Plot centroids with labels
+    for n in nodes:
+        lon, lat = n["lon"], n["lat"]
+        ax.scatter(lon, lat, c="red", s=40)
+        ax.text(lon, lat, n["name"], fontsize=9)
+
+    # Title
+    if title_suffix:
+        full_title = f"Suburbs + macro edges for {place} {title_suffix}"
+    else:
+        full_title = f"Suburbs + macro edges for {place}"
+
+    plt.title(full_title)
+    plt.tight_layout()
+
+    # Save to specific folder
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, filename)
+    plt.savefig(output_path, dpi=500)
+    print(f"Saved plot as {output_path}")
 
 
 
@@ -266,18 +302,20 @@ def generate_city_network_raw(
     place: str,
     default_speed_kmh: float = 40.0,
     plot: bool = True,
-    k_neighbors: int = 2,
+    k_lateral: int = 2,      
     k_center: int = 4,
     central_suburbs: list = None,
-) -> dict:
+    output_dir: str = "/home/vida/Desktop/TESI/thesis_code/instances/CITY/TORINO_SUB",
+    filename: str = "torino_suburbs_raw.png",
+) -> tuple[dict, nx.MultiDiGraph]:
     """
     Generate a macro CITY network for a given place based on OSM suburbs.
 
     - Each node is a suburb (place=suburb) in the given place.
-    - Node id is the nearest OSM street node to the suburb centroid.
-    - Edges are built with a hub–centric neighborhood strategy:
-        * local k-nearest neighbor edges for each suburb
-        * extra radial edges from non-central suburbs to central ones.
+    - Each suburb is mapped to the nearest OSM street node (centroid).
+    - Undirected edges are built as:
+        * central suburbs  -> connected to their k_center nearest suburbs
+        * non-central ones -> connected to their k_lateral nearest suburbs
 
     Parameters
     ----------
@@ -287,8 +325,8 @@ def generate_city_network_raw(
         Speed used to compute travel time if needed.
     plot : bool
         If True, plot the city graph, suburbs and macro edges.
-    k_neighbors : int
-        Number of nearest neighbors for non-central suburbs.
+    k_lateral : int
+        Number of nearest neighbors for central suburbs. 
     k_center : int
         Number of nearest neighbors for central suburbs.
     central_suburbs : list
@@ -297,34 +335,31 @@ def generate_city_network_raw(
     Returns
     -------
     network_dict : dict
-        Unified network dictionary with:
-            - type
-            - place
-            - nodes: [ {id, name, lat, lon}, ... ]
-            - edges: [ {u, v, length_km, time_min}, ... ]
-            - default_speed_kmh
     """
     if central_suburbs is None:
         central_suburbs = []
 
-    ### CITY GRAPH
+    # ------------------------
+    # 1) Download city graph
+    # ------------------------
     osm_graph = ox.graph_from_place(
         place,
         network_type="drive",
         simplify=True,
     )
 
-    ### SUBURBS
+    # ------------------------
+    # 2) Get suburbs polygons
+    # ------------------------
     tags = {"place": ["suburb"]}
     gdf = ox.features_from_place(place, tags=tags)
 
-    # Keep only name + geometry
     gdf_sub = gdf[["name", "geometry"]].dropna(subset=["name", "geometry"])
-
-    # Merge geometries with the same name (in case of multiple polygons)
     gdf_grouped = gdf_sub.dissolve(by="name")  # index = name
 
-    ### Compute centroids and map each suburb to nearest OSM street node
+    # ------------------------
+    # 3) Centroids -> nearest OSM node
+    # ------------------------
     suburb_nodes = {}   # name -> osm node id
     node_entries = []   # list of dicts for "nodes" in JSON
 
@@ -332,11 +367,9 @@ def generate_city_network_raw(
         centroid = row["geometry"].centroid
         lat, lon = centroid.y, centroid.x
 
-        # nearest street node in the downloaded osm_graph
         osm_node = ox.distance.nearest_nodes(osm_graph, X=lon, Y=lat)
 
         suburb_nodes[name] = osm_node
-
         node_entries.append({
             "id": int(osm_node),
             "name": str(name),
@@ -345,31 +378,33 @@ def generate_city_network_raw(
         })
 
     # ------------------------------------------------------------
-    # Edge construction: hub–centric neighborhood graph
+    # Edge construction: central = k_center, lateral = k_lateral
     # ------------------------------------------------------------
-    edges = []
     suburb_names = sorted(suburb_nodes.keys())
 
-    # name -> (lat, lon)
+    # Mapping: suburb name -> (lat, lon)
     coords = {entry["name"]: (entry["lat"], entry["lon"]) for entry in node_entries}
 
     def geo_dist2(a, b):
-        """Squared distance between two (lat, lon) points (no sqrt needed for ordering)."""
+        """
+        Squared geographic distance between two centroids (lat, lon).
+        We use squared distance because it preserves ordering and avoids sqrt().
+        """
         (lat1, lon1), (lat2, lon2) = a, b
         return (lat1 - lat2) ** 2 + (lon1 - lon2) ** 2
 
-    # (1) Local edges: k-nearest neighbors per suburb
+    # Undirected adjacency list: suburb_name -> set(neighbor_names)
+    adjacency = {name: set() for name in suburb_names}
+
+    # ------------------------------------------------------------
+    # (1) INITIAL STEP: each suburb picks its nearest neighbors
+    #     - central suburbs use k_center
+    #     - lateral suburbs use k_lateral
+    # ------------------------------------------------------------
     for name_u in suburb_names:
-        u = suburb_nodes[name_u]
         cu = coords[name_u]
 
-        # central suburbs are more connected
-        if name_u in central_suburbs:
-            k = k_center
-        else:
-            k = k_neighbors
-
-        # candidate neighbors (all others)
+        # Build candidate list: all *other* suburbs with their distance
         cand = []
         for name_v in suburb_names:
             if name_v == name_u:
@@ -378,186 +413,564 @@ def generate_city_network_raw(
             d2 = geo_dist2(cu, cv)
             cand.append((name_v, d2))
 
+        # Sort candidates by proximity
         cand.sort(key=lambda x: x[1])
-        nearest = [name_v for (name_v, _) in cand[:k]]
 
-        for name_v in nearest:
-            v = suburb_nodes[name_v]
+        # Decide how many neighbors to keep (central vs lateral)
+        if name_u in central_suburbs:
+            k = min(k_center, len(cand))
+        else:
+            k = min(k_lateral, len(cand))
 
+        # List of the selected nearest neighbor names
+        chosen = [name_v for (name_v, _) in cand[:k]]
+
+        # Update adjacency (undirected)
+        for name_v in chosen:
+            adjacency[name_u].add(name_v)
+            adjacency[name_v].add(name_u)
+
+    # ------------------------------------------------------------
+    # (2) ADJUSTMENT STEP:
+    #     Try to enforce:
+    #       - central suburbs: exactly k_center neighbors
+    #       - non-central suburbs: exactly k_lateral neighbors
+    # ------------------------------------------------------------
+    for name_u in suburb_names:
+        # target degree for this suburb
+        if name_u in central_suburbs:
+            target_deg = k_center
+        else:
+            target_deg = k_lateral
+
+        cu = coords[name_u]
+
+        # ----------------------------
+        # (2a) Se ha meno del target:
+        #      aggiungi vicini mancanti
+        # ----------------------------
+        neighbors = list(adjacency[name_u])
+        if len(neighbors) < target_deg:
+            # candidati = tutti gli altri suburb che non sono già vicini
+            cand = []
+            for name_v in suburb_names:
+                if name_v == name_u:
+                    continue
+                if name_v in adjacency[name_u]:
+                    continue
+                cv = coords[name_v]
+                d2 = geo_dist2(cu, cv)
+                cand.append((name_v, d2))
+
+            # ordina per distanza geometrica
+            cand.sort(key=lambda x: x[1])
+
+            # aggiungi i più vicini finché non raggiungi target_deg
+            for (name_v, _) in cand:
+                adjacency[name_u].add(name_v)
+                adjacency[name_v].add(name_u)  # grafo non orientato
+                neighbors.append(name_v)
+                if len(neighbors) >= target_deg:
+                    break
+
+        # ----------------------------
+        # (2b) Se ha più del target:
+        #      tieni solo i target_deg più vicini
+        # ----------------------------
+        neighbors = list(adjacency[name_u])  # aggiorna dopo eventuali aggiunte
+        if len(neighbors) > target_deg:
+            # ordina i vicini per distanza
+            neighbors.sort(key=lambda name_v: geo_dist2(cu, coords[name_v]))
+
+            keep = set(neighbors[:target_deg])
+            remove = set(neighbors[target_deg:])
+
+            for name_v in remove:
+                adjacency[name_u].discard(name_v)
+                adjacency[name_v].discard(name_u)
+
+
+
+    # ------------------------------------------------------------
+    # (3) Convert adjacency structure into final edge list
+    #     Each edge (u,v) is undirected → only one entry per pair.
+    #     Distances come from OSM shortest-path length.
+    # ------------------------------------------------------------
+    edges = []
+    seen_pairs = set()  # prevent duplicates of (u,v) and (v,u)
+
+    for name_u in suburb_names:
+        u_node = suburb_nodes[name_u]
+        for name_v in adjacency[name_u]:
+            v_node = suburb_nodes[name_v]
+
+            # Normalize undirected pair
+            pair_key = tuple(sorted((u_node, v_node)))
+            if pair_key in seen_pairs:
+                continue
+            seen_pairs.add(pair_key)
+
+            # Try shortest path u→v; if no path, try v→u
             try:
                 length_m = nx.shortest_path_length(
-                    osm_graph, source=u, target=v, weight="length"
+                    osm_graph, source=u_node, target=v_node, weight="length"
                 )
             except nx.NetworkXNoPath:
-                continue
+                try:
+                    length_m = nx.shortest_path_length(
+                        osm_graph, source=v_node, target=u_node, weight="length"
+                    )
+                except nx.NetworkXNoPath:
+                    continue  # no path exists in either direction → skip
 
             length_km = float(length_m) / 1000.0
             time_min = (length_km / default_speed_kmh) * 60.0
 
             edges.append({
-                "u": int(u),
-                "v": int(v),
+                "u": int(u_node),
+                "v": int(v_node),  # undirected edge represented as (u,v)
                 "length_km": length_km,
                 "time_min": float(time_min),
             })
 
-    # (2) Radial edge: each non-central suburb connects to its closest central hub
-    central_coords = {name: coords[name] for name in suburb_names if name in central_suburbs}
-    if central_coords:
-        for name_u in suburb_names:
-            if name_u in central_suburbs:
-                continue  # hubs already dense
 
-            u = suburb_nodes[name_u]
-            cu = coords[name_u]
-
-            best_name = None
-            best_d2 = None
-            for name_c, cc in central_coords.items():
-                d2 = geo_dist2(cu, cc)
-                if best_d2 is None or d2 < best_d2:
-                    best_d2 = d2
-                    best_name = name_c
-
-            if best_name is None:
-                continue
-
-            v = suburb_nodes[best_name]
-
-            # avoid duplicates if already created in k-nearest step
-            if any(e["u"] == int(u) and e["v"] == int(v) for e in edges):
-                continue
-
-            try:
-                length_m = nx.shortest_path_length(
-                    osm_graph, source=u, target=v, weight="length"
-                )
-            except nx.NetworkXNoPath:
-                continue
-
-            length_km = float(length_m) / 1000.0
-            time_min = (length_km / default_speed_kmh) * 60.0
-
-            edges.append({
-                "u": int(u),
-                "v": int(v),
-                "length_km": length_km,
-                "time_min": float(time_min),
-            })
 
     network_dict = {
-        "type": "CITY_SUBURB",
+        "type": "CITY_SUBURB_UNDIRECTED",
         "place": place,
         "default_speed_kmh": float(default_speed_kmh),
         "nodes": node_entries,
         "edges": edges,
     }
 
-    # ----------------------------------------
-    # Print current edges as MANUAL_EDGES list (DIRECTED)
-    # ----------------------------------------
-    id_to_name = {n["id"]: n["name"] for n in node_entries}
+    # --------------
+    # Optional: plot
+    # --------------
+    if plot:
+        plot_city_suburb_network(
+            osm_graph=osm_graph,
+            network_dict=network_dict,
+            place=place,
+            output_dir=output_dir,
+            filename=filename,
+            title_suffix="(raw)",
+        )
+
+    return network_dict, osm_graph
+
+
+def generate_city_network_merged(
+    osm_graph,
+    base_network: dict,
+    merge_groups: list[tuple[str, ...]],
+    place: str,
+    plot: bool = True,
+    output_dir: str = "/home/vida/Desktop/TESI/thesis_code/instances/CITY/TORINO_SUB",
+    filename: str = "torino_suburbs_merged.png",
+) -> dict:
+    """
+    Merge groups of suburbs into single macro-nodes.
+
+    Parameters
+    ----------
+    osm_graph : networkx.MultiDiGraph
+        Grafo OSM originale (serve solo per il plot finale).
+    base_network : dict
+        Network dict con chiavi "nodes" e "edges" (output di generate_city_network_raw).
+    merge_groups : list[tuple[str, ...]]
+        Ogni tupla è un gruppo di quartieri da unire, es:
+            [("Vanchiglietta", "Madonna del Pilone"),
+             ("Vallette", "Lucento", "Borgo Vittoria")]
+    place : str
+        Nome del posto (per il titolo del plot).
+    """
+
+    nodes = base_network["nodes"]
+    edges = base_network["edges"]
+
+    # Map name -> node dict
+    name_to_node = {n["name"]: n for n in nodes}
+
+    # Track which original node IDs are merged into which new node ID
+    old_id_to_new_id = {}
+
+    new_nodes = []
+    used_ids = {n["id"] for n in nodes}
+    next_id = max(used_ids) + 1 if used_ids else 0
+
+    # 1) copia tutti i nodi NON mergiati
+    merged_names_flat = {name for group in merge_groups for name in group}
+    for n in nodes:
+        if n["name"] not in merged_names_flat:
+            new_nodes.append(n)
+
+    # 2) crea un nodo mergiato per ogni gruppo
+    for group in merge_groups:
+        group_nodes = []
+        for name in group:
+            if name not in name_to_node:
+                print(f"[WARN] merge_suburbs: suburb '{name}' not found in nodes.")
+                continue
+            group_nodes.append(name_to_node[name])
+
+        if not group_nodes:
+            continue
+
+        # Centroid (media lat/lon)
+        avg_lat = sum(n["lat"] for n in group_nodes) / len(group_nodes)
+        avg_lon = sum(n["lon"] for n in group_nodes) / len(group_nodes)
+
+        # Nome del nodo mergiato
+        base_name = " + ".join(n["name"] for n in group_nodes)
+        merged_name = base_name
+
+        merged_id = next_id
+        next_id += 1
+
+        # Mappa gli id vecchi -> nuovo id
+        for n in group_nodes:
+            old_id_to_new_id[n["id"]] = merged_id
+
+        new_nodes.append({
+            "id": merged_id,
+            "name": merged_name,
+            "lat": float(avg_lat),
+            "lon": float(avg_lon),
+        })
+
+    # 3) Ricollega gli archi ai nuovi id, eliminando self-loop e duplicati
+    new_edges = []
+    seen_pairs = set()  # per evitare duplicati (u,v) e (v,u) per grafo non orientato
 
     for e in edges:
         u = e["u"]
         v = e["v"]
-        name_u = id_to_name.get(u)
-        name_v = id_to_name.get(v)
-        if name_u is None or name_v is None:
+
+        u_new = old_id_to_new_id.get(u, u)
+        v_new = old_id_to_new_id.get(v, v)
+
+        # Self-loop creati dal merge → via
+        if u_new == v_new:
             continue
-        print(f'("{name_u}", "{name_v}"),')
 
+        pair_key = tuple(sorted((u_new, v_new)))
+        if pair_key in seen_pairs:
+            continue
+        seen_pairs.add(pair_key)
 
+        new_edges.append({
+            "u": int(u_new),
+            "v": int(v_new),
+            "length_km": e["length_km"],
+            "time_min": e["time_min"],
+        })
 
+    new_network = dict(base_network)
+    new_network["nodes"] = new_nodes
+    new_network["edges"] = new_edges
+    new_network["type"] = "CITY_SUBURB_MERGED"
 
-
-    # -----------------------
-    # Optional plot (to file)
-    # -----------------------
-    plt.switch_backend("Agg")
+    # Plot opzionale
     if plot:
-        # background: city street graph
-        fig, ax = ox.plot_graph(osm_graph, show=False, close=False, bgcolor="white")
+        plot_city_suburb_network(
+            osm_graph=osm_graph,
+            network_dict=new_network,
+            place=place,
+            output_dir=output_dir,
+            filename=filename,
+            title_suffix="(merged)",
+        )
 
-        # node_id -> (lon, lat)
-        id_to_coord = {
-            entry["id"]: (entry["lon"], entry["lat"])
-            for entry in node_entries
-        }
+    return new_network
 
-        # draw macro edges
-        print(len(edges))
-        for e in edges:
-            u = e["u"]
-            v = e["v"]
-            if u not in id_to_coord or v not in id_to_coord:
+
+def generate_city_network_reworked(
+    osm_graph,
+    base_network: dict,
+    place: str,
+    # possono essere nomi (str) o id (int)
+    remove_edges: list[tuple[object, object]] | None = None,
+    add_edges: list[tuple[object, object]] | None = None,
+    default_speed_kmh: float | None = None,
+    plot: bool = True,
+    output_dir: str = "/home/vida/Desktop/TESI/thesis_code/instances/CITY/TORINO_SUB",
+    filename: str = "torino_suburbs_final.png",
+) -> dict:
+    """
+    Terzo step: pulizia manuale del grafo.
+    - remove_edges / add_edges possono usare nomi o id dei nodi del base_network.
+    - Per le distanze, ogni nodo (anche mergiato) viene mappato a un nodo OSM
+      usando lat/lon e ox.distance.nearest_nodes.
+    """
+    if remove_edges is None:
+        remove_edges = []
+    if add_edges is None:
+        add_edges = []
+
+    nodes = list(base_network["nodes"])
+    edges = list(base_network["edges"])
+
+    # -----------------------------
+    # 1) Mapping name <-> id (MERGED)
+    # -----------------------------
+    name_to_id = {n["name"]: n["id"] for n in nodes}
+
+    def resolve_node(ref):
+        """Accetta un nome (str) o un id (int) e restituisce sempre l'id MERGED."""
+        if isinstance(ref, int):
+            return ref
+        if isinstance(ref, str):
+            if ref not in name_to_id:
+                raise ValueError(f"Node name '{ref}' not found in network nodes.")
+            return name_to_id[ref]
+        raise TypeError(f"Node reference must be int or str, got {type(ref)}")
+
+    # -----------------------------
+    # 2) Mapping id MERGED -> id OSM
+    # -----------------------------
+    # Alcuni id sono già nodi OSM, altri (mergiati) no.
+    # Per tutti, associamo un osm_id valido (usando lat/lon se serve).
+    nodeid_to_osmid = {}
+    for n in nodes:
+        nid = n["id"]
+        lat = n["lat"]
+        lon = n["lon"]
+
+        if nid in osm_graph.nodes:
+            osm_id = nid
+        else:
+            # nodo mergiato: trova il nodo OSM più vicino
+            osm_id = ox.distance.nearest_nodes(osm_graph, X=lon, Y=lat)
+
+        nodeid_to_osmid[nid] = osm_id
+
+    # -----------------------------
+    # 3) Normalizza remove/add in termini di id MERGED
+    # -----------------------------
+    remove_id_pairs = []
+    for (u_ref, v_ref) in remove_edges:
+        u_id = resolve_node(u_ref)
+        v_id = resolve_node(v_ref)
+        remove_id_pairs.append(tuple(sorted((u_id, v_id))))
+
+    add_id_pairs = []
+    for (u_ref, v_ref) in add_edges:
+        u_id = resolve_node(u_ref)
+        v_id = resolve_node(v_ref)
+        add_id_pairs.append(tuple(sorted((u_id, v_id))))
+
+    remove_set = set(remove_id_pairs)
+    add_set = set(add_id_pairs)
+
+    if default_speed_kmh is None:
+        default_speed_kmh = float(base_network.get("default_speed_kmh", 40.0))
+
+    # -----------------------------
+    # 4) Rimuovi archi indesiderati
+    # -----------------------------
+    new_edges = []
+    for e in edges:
+        pair = tuple(sorted((e["u"], e["v"])))
+        if pair in remove_set:
+            continue
+        new_edges.append(e)
+
+    # -----------------------------
+    # 5) Aggiungi archi nuovi (usando OSM per la distanza)
+    # -----------------------------
+    existing_pairs = {tuple(sorted((e["u"], e["v"]))) for e in new_edges}
+
+    for (u_id, v_id) in add_set:
+        pair = tuple(sorted((u_id, v_id)))
+        if pair in existing_pairs:
+            continue  # già esiste
+
+        # recupera i nodi OSM corrispondenti (sempre validi)
+        u_osm = nodeid_to_osmid[u_id]
+        v_osm = nodeid_to_osmid[v_id]
+
+        # prova shortest path u_osm → v_osm
+        try:
+            length_m = nx.shortest_path_length(
+                osm_graph, source=u_osm, target=v_osm, weight="length"
+            )
+        except (nx.NetworkXNoPath, nx.NodeNotFound):
+            try:
+                length_m = nx.shortest_path_length(
+                    osm_graph, source=v_osm, target=u_osm, weight="length"
+                )
+            except (nx.NetworkXNoPath, nx.NodeNotFound):
+                print(f"[WARN] No path between merged nodes {u_id} and {v_id} (OSM {u_osm}-{v_osm}), skipping.")
                 continue
 
-            lon_u, lat_u = id_to_coord[u]
-            lon_v, lat_v = id_to_coord[v]
+        length_km = float(length_m) / 1000.0
+        time_min = (length_km / default_speed_kmh) * 60.0
 
-            ax.plot(
-                [lon_u, lon_v],
-                [lat_u, lat_v],
-                linewidth=0.8,
-                alpha=0.5,
-            )
+        new_edges.append({
+            "u": int(u_id),      # id MERGED nel tuo network
+            "v": int(v_id),
+            "length_km": length_km,
+            "time_min": float(time_min),
+        })
+        existing_pairs.add(pair)
 
-        # centroids + labels
-        for entry in node_entries:
-            ax.scatter(entry["lon"], entry["lat"], c="red", s=40)
-            ax.text(entry["lon"], entry["lat"], entry["name"], fontsize=8)
+    network_dict = {
+        "type": "CITY_SUBURB_FINAL",
+        "place": place,
+        "default_speed_kmh": float(default_speed_kmh),
+        "nodes": nodes,
+        "edges": new_edges,
+    }
 
-        plt.title(f"Suburbs + macro edges for {place}")
-        plt.tight_layout()
-        plt.savefig("torino_suburbs.png", dpi=500)
-        print("Saved plot as torino_suburbs.png")
+    # Plot opzionale
+    if plot:
+        plot_city_suburb_network(
+            osm_graph=osm_graph,
+            network_dict=network_dict,
+            place=place,
+            output_dir=output_dir,
+            filename=filename,
+            title_suffix="(final)",
+        )
 
     return network_dict
 
 
-
-
-"""
-Edge construction: hub–centric neighborhood graph
--------------------------------------------------
-
-Instead of a fully-connected graph, we build a sparse, road-like structure:
-
-(1) Local edges (k-nearest neighbors):
-    - Each suburb u connects only to its geographically closest neighbors.
-    - Central suburbs use k_center neighbors (denser core), while peripheral
-      suburbs use k_neighbors (sparser periphery).
-    - For each selected neighbor v, edge cost is the shortest-path distance
-      on the OSM road graph (in km and minutes).
-
-(2) Radial edges to the center:
-    - Each NON-central suburb gets at least one edge to the nearest central
-      suburb, unless already connected.
-    - This creates a hub–and–spoke structure and ensures global connectivity.
-"""
-
-#def rielaborate_city_network_Turin()
-
-
-
-
-
-
-def save_network_json(network_dict: dict, output_dir: str, filename: str = "network.json") -> None:
+def make_network_directed(network_dict: dict) -> dict:
     """
-    Save a network dictionary to a JSON file.
+    Prende un network con archi non orientati (u,v) unici
+    e restituisce un nuovo network con archi orientati:
+        (u,v) e (v,u) con stessi length_km e time_min.
     """
-    out_dir = Path(output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    nodes = list(network_dict["nodes"])
+    undirected_edges = network_dict["edges"]
 
-    out_path = out_dir / filename
+    directed_edges = []
+    for e in undirected_edges:
+        u = e["u"]
+        v = e["v"]
+        length_km = e["length_km"]
+        time_min = e["time_min"]
 
-    with out_path.open("w", encoding="utf-8") as f:
-        json.dump(network_dict, f, indent=2)
+        # arco u -> v
+        directed_edges.append({
+            "u": int(u),
+            "v": int(v),
+            "length_km": float(length_km),
+            "time_min": float(time_min),
+        })
+        # arco v -> u (ritorno)
+        directed_edges.append({
+            "u": int(v),
+            "v": int(u),
+            "length_km": float(length_km),
+            "time_min": float(time_min),
+        })
 
-    #print(f"[INFO] Saved network to: {out_path}")
+    new_network = dict(network_dict)
+    new_network["type"] = network_dict.get("type", "") + "_DIRECTED"
+    new_network["edges"] = directed_edges
+    new_network["is_directed"] = True
 
+    return new_network
+
+
+
+
+
+def generate_grid_network_city(
+    place: str = "Torino, Italia",
+    central_suburbs: list[str] = ["Centro", "Crocetta", "Santa Rita", "Aurora"],
+    speed_kmh: float = 40.0
+):
+
+    # 1) RAW network
+    city_network_raw, osm_graph = generate_city_network_raw(
+        place=place,
+        default_speed_kmh=40.0,
+        plot=True,
+        k_lateral=2,
+        k_center=4,
+        central_suburbs=central_suburbs
+    )
+
+    merge_groups = [
+        ("Vanchiglia", "Vanchiglietta", "Madonna del Pilone"),
+        ("Madonna di Campagna", "Borgo Vittoria"),
+        ("San Donato", "Campidoglio", "Cit Turin"),
+        ("Cenisia", "Borgo San Paolo"),
+        ("Regio Parco", "Barca"),
+        ("Lingotto", "Filadelfia"),
+        ("Parella", "Pozzo Strada"),
+        ("Vallette", "Lucento"),
+        ("Villaretto", "Falchera"),
+        ("Mirafiori Sud", "Mirafiori Nord")
+
+    ]
+
+    # 2) MERGED network (starting from RAW)
+    city_network_merged = generate_city_network_merged(
+        osm_graph=osm_graph,
+        base_network=city_network_raw,
+        merge_groups=merge_groups,
+        place=place,
+        plot=True,
+    )
+
+    remove_edges = [
+        ("San Donato + Campidoglio + Cit Turin", "Crocetta"),
+        ("Rebaudengo", "Regio Parco + Barca"),
+        ("Borgo Po", "Vanchiglia + Vanchiglietta + Madonna del Pilone"),
+        ("Madonna di Campagna + Borgo Vittoria", "Aurora"),
+        ("Vallette + Lucento", "Barriera di Lanzo"),
+        ("Vallette + Lucento", "Parella + Pozzo Strada"),
+        ("Santa Rita",  "Cenisia + Borgo San Paolo")
+    ]
+    add_edges = [
+        ("San Donato + Campidoglio + Cit Turin", "Centro"),
+        ("Centro", "Crocetta"),
+        #("Vallette + Lucento", "San Donato + Campidoglio + Cit Turin"),
+        ("Regio Parco + Barca", "Barriera di Milano"),
+        ("Santa Rita", "Crocetta"),
+        #("San Donato + Campidoglio + Cit Turin", "Aurora"),
+        #("Vanchiglia + Vanchiglietta + Madonna del Pilone", "Aurora"),
+        ("Madonna di Campagna + Borgo Vittoria", "Barriera di Milano"),
+        ("Vallette + Lucento", "Madonna di Campagna + Borgo Vittoria"),
+        ("San Donato + Campidoglio + Cit Turin", "Madonna di Campagna + Borgo Vittoria") 
+    ]
+
+    # 3) REWORKED network (starting from MERGED)
+    city_network_final = generate_city_network_reworked(
+        osm_graph=osm_graph,
+        base_network=city_network_merged,
+        place=place,
+        remove_edges=remove_edges,
+        add_edges=add_edges,
+        plot=True,
+    )
+
+    # 4) Convert to directed 
+    city_network_directed = make_network_directed(city_network_final)
+
+    # 5) Print
+    num_nodes = len(city_network_directed["nodes"])
+    num_edges = len(city_network_directed["edges"])
+
+    print(f"# N°NODES:    {num_nodes}")
+    print(f"# N°EDGES:   {num_edges}")
+
+    # 6) Network dict
+    nodes = city_network_directed["nodes"]
+    edges = city_network_directed["edges"]
+
+    network_dict = {
+        "type": "CITY",
+        "place": place,
+        "nodes": nodes,          
+        "edges": edges,          
+        "speed_kmh": float(speed_kmh),
+    }
+    return network_dict
 
 
 
@@ -565,62 +978,94 @@ def save_network_json(network_dict: dict, output_dir: str, filename: str = "netw
 
 ### TEST MAIN ###
 if __name__ == "__main__":
-    ### GRID TEST ###
-    side = 3
-    edge_length_km = 1.0
-    speed_kmh = 40.0
+    place = "Torino, Italia",
+    name = "Torino",
+    city_output_folder = "/home/vida/Desktop/TESI/thesis_code/instances/CITY/TORINO_SUB",
+    central_suburbs = ["Centro", "Crocetta", "Santa Rita", "Aurora"],
 
-    folder_name = f"{side}x{side}"
-    output_folder = f"instances/GRID/{folder_name}"
-
-    network = generate_grid_network(
-        side=side,
-        edge_length_km=edge_length_km,
-        speed_kmh=speed_kmh,
-    )
-
-    save_network_json(
-        network_dict=network,
-        output_dir=output_folder,
-        filename="network.json"
-    )
-
-    ### CITY TEST (TORINO SUBURB) ###
-    place = "Torino, Italia"
-
-    # Download detailed city graph from OSM
-    G_city = ox.graph_from_place(
-        place,
-        network_type="drive",
-        simplify=True,
-    )
-
-    central_suburbs = [   # EXISTING IN OSM
-        "Centro",    
-        "San Salvario",
-        "Crocetta",
-        "Aurora",
-        "Vanchiglia",
-    ]
-
-    city_network = generate_city_network_raw(
+    # 1) RAW network
+    city_network_raw, osm_graph = generate_city_network_raw(
         place=place,
         default_speed_kmh=40.0,
         plot=True,
-        k_neighbors=1,
-        k_center=2,
-        central_suburbs=central_suburbs,
+        k_lateral=2,
+        k_center=4,
+        central_suburbs=central_suburbs
     )
 
+    
 
-    #city_network = rielaborate_city_network_Turin()
+    merge_groups = [
+        ("Vanchiglia", "Vanchiglietta", "Madonna del Pilone"),
+        ("Madonna di Campagna", "Borgo Vittoria"),
+        ("San Donato", "Campidoglio", "Cit Turin"),
+        ("Cenisia", "Borgo San Paolo"),
+        ("Regio Parco", "Barca"),
+        ("Lingotto", "Filadelfia"),
+        ("Parella", "Pozzo Strada"),
+        ("Vallette", "Lucento"),
+        ("Villaretto", "Falchera")
 
+    ]
 
+    # 2) MERGED network (starting from RAW)
+    city_network_merged = generate_city_network_merged(
+        osm_graph=osm_graph,
+        base_network=city_network_raw,
+        merge_groups=merge_groups,
+        place=place,
+        plot=True,
+    )
 
+    remove_edges = [
+        ("San Donato + Campidoglio + Cit Turin", "Crocetta"),
+        ("Rebaudengo", "Regio Parco + Barca"),
+        ("Borgo Po", "Vanchiglia + Vanchiglietta + Madonna del Pilone"),
+        ("Madonna di Campagna + Borgo Vittoria", "Aurora"),
+        ("Vallette + Lucento", "Barriera di Lanzo"),
+        ("Vallette + Lucento", "Parella + Pozzo Strada"),
+        ("Santa Rita",  "Cenisia + Borgo San Paolo")
+    ]
+    add_edges = [
+        ("San Donato + Campidoglio + Cit Turin", "Centro"),
+        ("Centro", "Crocetta"),
+        #("Vallette + Lucento", "San Donato + Campidoglio + Cit Turin"),
+        ("Regio Parco + Barca", "Barriera di Milano"),
+        ("Santa Rita", "Crocetta"),
+        #("San Donato + Campidoglio + Cit Turin", "Aurora"),
+        #("Vanchiglia + Vanchiglietta + Madonna del Pilone", "Aurora"),
+        ("Madonna di Campagna + Borgo Vittoria", "Barriera di Milano"),
+        ("Vallette + Lucento", "Madonna di Campagna + Borgo Vittoria"),
+        ("San Donato + Campidoglio + Cit Turin", "Madonna di Campagna + Borgo Vittoria") 
+    ]
 
-    city_output_folder = "instances/CITY/TORINO_SUBURB"
+    # 3) REWORKED network (starting from MERGED)
+    city_network_final = generate_city_network_reworked(
+        osm_graph=osm_graph,
+        base_network=city_network_merged,
+        place=place,
+        remove_edges=remove_edges,
+        add_edges=add_edges,
+        plot=True,
+    )
+
+    # 4) Convert to directed 
+    city_network_directed = make_network_directed(city_network_final)
+
+    # 5) Print
+    num_nodes = len(city_network_directed["nodes"])
+    num_edges = len(city_network_directed["edges"])
+    print(f"# NODI FINALI:    {num_nodes}")
+    print(f"# ARCHI FINALI:   {num_edges} (diretti, andata+ritorno)")
+
+    # 6) Save
     save_network_json(
-        network_dict=city_network,
+        network_dict=city_network_directed,
         output_dir=city_output_folder,
-        filename="network.json"
+        filename=f"network_{name}_directed.json",
     )
+
+
+
+
+
