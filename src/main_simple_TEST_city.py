@@ -1,4 +1,4 @@
-from utils.runs_fun import *
+from utils.simple.runs_fun import *
 
 import pandas as pd
 from pathlib import Path
@@ -132,7 +132,7 @@ if __name__ == "__main__":
         f"K{num_requests}_"
         f"Nw{num_Nw}.csv"
     )
-    summary_path = Path("results/CITY/TORINO_SUB") / summary_name
+    summary_path = Path("results/CITY/TORINO_SUB/summary") / summary_name
 
     df_results.to_csv(summary_path, index=False)
 

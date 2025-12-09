@@ -1,4 +1,4 @@
-from utils.runs_fun import *
+from utils.simple.runs_fun import *
 
 import pandas as pd
 from pathlib import Path

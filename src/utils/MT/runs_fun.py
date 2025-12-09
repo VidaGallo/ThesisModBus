@@ -9,14 +9,14 @@ from data_generation.generate_data import *
 import time
 
 
-from models.deterministic.model_taxi_like_ab import *
-from models.deterministic.model_taxi_like_ab_LR import *
+from models.deterministic.model_simple_ab import *
+from models.deterministic.model_simple_ab_LR import *
 
-from models.deterministic.model_taxi_like_ab_relax import *
-from models.deterministic.model_taxi_like_ab_LR_relax import *
+from models.deterministic.model_simple_ab_relax import *
+from models.deterministic.model_simple_ab_LR_relax import *
 
-from models.deterministic.model_taxi_like_ab_plat import *
-from models.deterministic.model_taxi_like_ab_LR_plat import *
+from models.deterministic.model_simple_ab_plat import *
+from models.deterministic.model_simple_ab_LR_plat import *
 
 
 # seed
