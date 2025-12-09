@@ -4,6 +4,7 @@
 # Virtual environments
 .venv*
 .venv310/
+.venv3103/
 env/
 ENV/
 venv/
