@@ -100,7 +100,7 @@ def generate_taxi_requests(
             q_values = list(range(q_min, q_max + 1))
 
             # exponential decay: weight(q) = exp(-alpha * (q-1))
-            alpha = 0.7
+            alpha = 1.0
             q_weights = [math.exp(-alpha * (q - q_min)) for q in q_values]
 
             # normalize

@@ -28,7 +28,7 @@ def configure_cplex(
 
     time_limit : Time limit in seconds.
 
-    mip_gap : Relative MIP gap tolerance (default: 1e-4).
+    mip_gap : Relative MIP gap tolerance.
 
     threads : Max number of threads 
                     0 = all
