@@ -28,15 +28,15 @@ if __name__ == "__main__":
     c_uns_taxi = 100
     g_plat = None    # or None
 
-    num_Nw = 5    # n°nodi che permettono lo scambio
+    num_Nw = 4    # n°nodi che permettono lo scambio
 
     q_min = 1
     q_max = 10
     slack_min = 20.0
 
     # Parametri SPECIFICI
-    number        = 5      # lato griglia
-    num_modules   = 5
+    number        = 4      # lato griglia
+    num_modules   = 4
     num_requests  = 10
     
 

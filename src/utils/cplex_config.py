@@ -13,7 +13,7 @@ np.random.seed(seed)
 def configure_cplex(
     mdl: Model,
     time_limit: float = 36_000,     # seconds
-    mip_gap: float = 0.03,          # relative MIP gap
+    mip_gap: float = 0.01,          # relative MIP gap
     threads: int = 0,               # max threads
     mip_display: int = 1,           # MIP log verbosity
     emphasis_mip: int = 2,          # 2 = optimality

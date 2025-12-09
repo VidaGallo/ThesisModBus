@@ -8,13 +8,10 @@ from data_generation.generate_data import *
 
 import time
 
-from models.deterministic.model_taxi_like import *
-from models.deterministic.model_taxi_like_LR import *
+
 from models.deterministic.model_taxi_like_ab import *
 from models.deterministic.model_taxi_like_ab_LR import *
 
-from models.deterministic.model_taxi_like_relax import *
-from models.deterministic.model_taxi_like_LR_relax import *
 from models.deterministic.model_taxi_like_ab_relax import *
 from models.deterministic.model_taxi_like_ab_LR_relax import *
 
@@ -396,18 +393,10 @@ def run_single_model_city(
 
     x = y = r = w = L = R = s = a = b = h = None
 
-    if model_name == "base":
-        model, x, y, r, w, s = create_taxi_like_model(instance)
-    elif model_name == "LR":
-        model, x, y, r, L, R, s = create_taxi_like_model_LR(instance)
-    elif model_name == "ab":
+    if model_name == "ab":
         model, x, y, r, w, s, a, b = create_taxi_like_model_ab(instance)
     elif model_name == "ab_LR":
         model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR(instance)
-    elif model_name == "base_relax":
-        model, x, y, r, w, s = create_taxi_like_model_relax(instance)
-    elif model_name == "LR_relax":
-        model, x, y, r, L, R, s = create_taxi_like_model_LR_relax(instance)
     elif model_name == "ab_relax":
         model, x, y, r, w, s, a, b = create_taxi_like_model_ab_relax(instance)
     elif model_name == "ab_LR_relax":
