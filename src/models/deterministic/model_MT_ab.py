@@ -201,6 +201,10 @@ def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h)
         mdl.sum(z[m, t0] for m in M) == len(P),
         ctname="initial_trail_attached_t0"
     )
+    mdl.add_constraint(
+        mdl.sum(kappa[i, t0] for i in Nw) == 0,
+        ctname="initial_trail_stock_zero"
+    )
 
 
     # ------------------------------------------------------------------

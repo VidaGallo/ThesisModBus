@@ -28,11 +28,11 @@ if __name__ == "__main__":
     c_uns = 100
     g_plat = None    # or None
 
-    num_Nw = 4    # n°nodi che permettono lo scambio
+    num_Nw = 2    # n°nodi che permettono lo scambio
 
     q_min = 1
     q_max = 10
-    slack_min = 20.0
+    slack_min = 10.0
 
     # Parametri SPECIFICI
     number        = 3      # lato griglia
