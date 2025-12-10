@@ -5,28 +5,8 @@ Instance Loader for CPLEX
 
 Utilities to build all sets and parameters needed by the MILP model,
 starting from:
-    - discretized network JSON (e.g. network_***maxmin_disc***max.json)
-    - discretized requests JSON (e.g. taxi_like_requests_***maxmin_disc***max.json)
-
-This module constructs:
-    Sets:
-        - N            : set of nodes
-        - A            : set of arcs (i,j)
-        - K            : set of requests
-        - T            : set of time periods {1,...,t_max}
-        - M            : set of modules {1,...,|M|}
-    Parameters:
-        - gamma[i,j]   : edge length (km)
-        - tau[i,j]     : discrete travel time in periods (time_steps)
-        - q[k]         : demand of request k
-        - orig[k]      : origin node of request k
-        - dest[k]      : destination node of request k
-        - Tk[k]        : list of time indices ΔT_k
-        - Tin[k]       : list of indices ΔT_k^{in}
-        - Tout[k]      : list of indices ΔT_k^{out}
-        - d_in[k,i,t]  : 1 if request k can board at node i at time t
-        - d_out[k,i,t] : 1 if request k can alight at node i at time t
-        - depot        : node
+    - discretized network JSON 
+    - discretized requests JSON 
 
 All time indices start from t = 1.
 """
@@ -142,34 +122,36 @@ def load_discrete_requests(requests_path: str, t_max: int):
 
 ##### Creation of the Instance Class with attributes inside
 def load_instance_discrete(
-    network_path: str,    
-    requests_path: str,   
+    network_path: str,
+    requests_path: str,
     dt: int,
     t_max: int,
-    num_modules: int,
+    num_modules: int,   # |M|
+    num_trail: int,     # |P|
     Q: int,
     c_km: float,
-    c_uns_taxi: float,
+    c_uns: float,
     g_plat: float,
     depot: int,
     num_Nw: int
 ) -> Instance:
-    
     """
     Build an Instance using already-discrete files.
 
     Parameters
     ----------
-    network_path : str   # path to the .json
-    requests_path : str  # path to the .json
-    dt : int             # discretization step (already used)
+    network_path : str   # path to the network .json
+    requests_path : str  # path to the requests .json
+    dt : int             # discretization step (minutes)
     t_max : int          # number of time slots
-    num_modules : int    # fleet size
+    num_modules : int    # number of MAIN modules |M|
+    num_trail : int      # number of TRAIL modules |P|
     Q : int              # module capacity
     c_km : float         # cost per km
-    c_uns_taxi : float   # unserved demand penalty
-    g_plat: float        # reward for platooning
-    depot: int           # depot node
+    c_uns : float        # unserved demand penalty
+    g_plat : float       # reward for platooning
+    depot : int          # depot node
+    num_Nw : int         # number of internal nodes where swaps are allowed
     """
 
     ### Discrete network
@@ -180,25 +162,33 @@ def load_instance_discrete(
 
     ### Modules
     M = set(range(1, num_modules + 1))    # {1,2,...,|M|}
+    P = set(range(1, num_trail + 1))     # TRAIL modules {1,...,|P|}
 
-    ### Discrete taxi-like requests
+    ### Discrete requests
     (
         K, q, origin, dest,
         DeltaT, DeltaT_in, DeltaT_out,
         d_in, d_out
     ) = load_discrete_requests(requests_path, t_max)
 
+    # (opzional) check for integer Z_max
+    if num_modules > 0 and (num_trail % num_modules != 0):
+        raise ValueError(
+            f"num_trail={num_trail} non è multiplo di num_modules={num_modules}: "
+            "Z_max = |P|/|M| non sarebbe intero."
+        )
 
     ### Build Class Instance
     return Instance(
         N=N,
         A=A,
         M=M,
+        P=P,
         K=K,
         T=T,
         Q=Q,
         c_km=c_km,
-        c_uns_taxi=c_uns_taxi,
+        c_uns=c_uns,
         g_plat=g_plat,
         gamma=gamma,
         tau_arc=tau_arc,

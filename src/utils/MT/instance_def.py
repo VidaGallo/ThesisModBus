@@ -37,15 +37,16 @@ class Instance:
     ### --- sets ---
     N: Set[Node]              # nodes
     A: Set[Arc]               # directed arcs (i, j)
-    M: Set[Module]            # available modules
-    K: Set[Request]           # taxi-like requests
+    M: Set[Module]            # available MAIN modules
+    P: Set[Module]            # available TRAIL modules
+    K: Set[Request]           # demand requests
     T: List[Time]             # discrete time periods [1, ..., t_max]
 
 
     ### --- global parameters ---
     Q: int                    # module capacity
     c_km: float               # cost per km
-    c_uns_taxi: float         # penalty cost for unserved taxi-like demand
+    c_uns: float              # penalty cost for unserved demand
     g_plat: float             # reward for having a platoon (to subtract to the c_op)
 
 
@@ -101,18 +102,38 @@ class Instance:
     
 
 
-    @property  # attribute "read-only"
+    @property
     def num_nodes(self) -> int:
         return len(self.N)
 
-
     @property
     def num_requests(self) -> int:
+        """|K| – number of requests."""
         return len(self.K)
-
 
     @property
     def num_modules(self) -> int:
+        """|M| – numero di moduli MAIN."""
         return len(self.M)
+
+    @property
+    def num_trail_modules(self) -> int:
+        """|P| – numero di moduli TRAIL."""
+        return len(self.P)
+
+    @property
+    def Z_max(self) -> int:
+        """
+        Z_max = |P| / |M|, con |P| multiplo di |M| come da definizione nel modello.
+        """
+        if self.num_modules == 0:
+            return 0
+        # opzionale: controllo di consistenza
+        if self.num_trail_modules % self.num_modules != 0:
+            raise ValueError(
+                f"|P|={self.num_trail_modules} non è multiplo di |M|={self.num_modules}, "
+                "non posso calcolare Z_max intero."
+            )
+        return self.num_trail_modules // self.num_modules
     
 

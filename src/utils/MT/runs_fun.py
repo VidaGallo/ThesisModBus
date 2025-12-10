@@ -1,22 +1,13 @@
-
-from utils.loader_fun import *
-from utils.instance_def import *
-from utils.print_fun import *
-from utils.cplex_config import *
-from utils.output_fun import *
+from utils.MT.loader_fun import *
+from utils.MT.instance_def import *
+from utils.MT.print_fun import *
+from utils.MT.cplex_config import *
+from utils.MT.output_fun import *
 from data_generation.generate_data import *
 
 import time
 
-
-from models.deterministic.model_simple_ab import *
-from models.deterministic.model_simple_ab_LR import *
-
-from models.deterministic.model_simple_ab_relax import *
-from models.deterministic.model_simple_ab_LR_relax import *
-
-from models.deterministic.model_simple_ab_plat import *
-from models.deterministic.model_simple_ab_LR_plat import *
+from models.deterministic.model_MT_ab import *
 
 
 # seed
@@ -27,15 +18,18 @@ random.seed(seed)
 np.random.seed(seed)
 
 
-### GRID
+# ======================================================================
+#  BUILD INSTANCE - GRID (ASYMMETRIC)
+# ======================================================================
 def build_instance_and_paths(
     number: int,
     horizon: int,
     dt: int,
     num_modules: int,
+    num_trails: int,       # |P|
     Q: int,
     c_km: float,
-    c_uns_taxi: float,
+    c_uns: float,         
     g_plat: float,
     num_requests: int,
     q_min: int,
@@ -46,14 +40,15 @@ def build_instance_and_paths(
     num_Nw: int
 ):
     """
-    Generate the network and the requests.
+    Generate the asymmetric GRID network and the requests, then build Instance.
     """
     random.seed(seed)
     np.random.seed(seed)
 
     t_max = horizon // dt
 
-    network_path, requests_path = generate_all_data_asym(    # Generating asym grid
+    # Generating asym grid
+    network_path, requests_path = generate_all_data_asym(
         number=number,
         horizon=horizon,
         dt=dt,
@@ -70,28 +65,32 @@ def build_instance_and_paths(
         dt=dt,
         t_max=t_max,
         num_modules=num_modules,
+        num_trail=num_trails,   # <-- |P|
         Q=Q,
         c_km=c_km,
-        c_uns_taxi=c_uns_taxi,
+        c_uns=c_uns,
         g_plat=g_plat,
         depot=depot,
-        num_Nw = num_Nw     # First N by degree
+        num_Nw=num_Nw          # first N by degree
     )
 
     return instance, network_path, requests_path, t_max
 
 
-### CITY
+# ======================================================================
+#  BUILD INSTANCE - CITY
+# ======================================================================
 def build_instance_and_paths_city(
-    city: str,      # city name
-    subdir: str,     # subdirectory name
+    city: str,                    # city name
+    subdir: str,                  # subdirectory name
     central_suburbs: list[str],
     horizon: int,
     dt: int,
     num_modules: int,
+    num_trails: int,               # |P|
     Q: int,
     c_km: float,
-    c_uns_taxi: float,
+    c_uns: float,
     g_plat: float,
     num_requests: int,
     q_min: int,
@@ -102,19 +101,18 @@ def build_instance_and_paths_city(
     num_Nw: int
 ):
     """
-    Generate the network and the requests.
+    Generate the CITY network and the requests, then build Instance.
     """
     random.seed(seed)
     np.random.seed(seed)
 
     t_max = horizon // dt
 
-
-
-    network_path, requests_path = generate_all_data_city(    # Generating network from a city
-        city = city,
-        subdir = subdir,
-        central_suburbs = central_suburbs,
+    # Generating network from a city
+    network_path, requests_path = generate_all_data_city(
+        city=city,
+        subdir=subdir,
+        central_suburbs=central_suburbs,
         horizon=horizon,
         dt=dt,
         num_requests=num_requests,
@@ -130,21 +128,21 @@ def build_instance_and_paths_city(
         dt=dt,
         t_max=t_max,
         num_modules=num_modules,
+        num_trail=num_trails,   # <-- |P|
         Q=Q,
         c_km=c_km,
-        c_uns_taxi=c_uns_taxi,
+        c_uns=c_uns,
         g_plat=g_plat,
         depot=depot,
-        num_Nw = num_Nw     # First N by degree
+        num_Nw=num_Nw          # first N by degree
     )
 
     return instance, network_path, requests_path, t_max
 
 
-
-
-
-### GRID
+# ======================================================================
+#  RUN SINGLE MODEL - GRID
+# ======================================================================
 def run_single_model(
     instance: Instance,
     model_name: str,
@@ -155,9 +153,10 @@ def run_single_model(
     number: int,
     horizon: int,
     num_modules: int,
+    num_trails: int,
     Q: int,
     c_km: float,
-    c_uns_taxi: float,
+    c_uns: float,
     g_plat: float,
     num_requests: int,
     q_min: int,
@@ -169,7 +168,7 @@ def run_single_model(
     base_output_folder,
 ) -> dict:
     """
-    Costruisce e risolve UNO dei modelli su una stessa Instance.
+    Costruisce e risolve UNO dei modelli su una stessa Instance (GRID).
     """
 
     # Sottocartella specifica per questo modello
@@ -177,39 +176,30 @@ def run_single_model(
     if not output_folder.exists():
         output_folder.mkdir(parents=True)
 
-    #print("-" * 80)
-    #print(f"[EXP {exp_id} | model={model_name}] Solving...")
-    #print("-" * 80)
-
     # ----------------
     # Costruzione modello
     # ----------------
     t_start_total = time.perf_counter()
 
     x = y = r = w = L = R = s = a = b = h = None
+    D = U = z = kappa = None   # variabili TRAIL per i modelli con platoon
 
-    if model_name == "base":
-        model, x, y, r, w, s = create_taxi_like_model(instance)
-    elif model_name == "LR":
-        model, x, y, r, L, R, s = create_taxi_like_model_LR(instance)
-    elif model_name == "ab":
-        model, x, y, r, w, s, a, b = create_taxi_like_model_ab(instance)
-    elif model_name == "ab_LR":
-        model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR(instance)
-    elif model_name == "base_relax":
-        model, x, y, r, w, s = create_taxi_like_model_relax(instance)
-    elif model_name == "LR_relax":
-        model, x, y, r, L, R, s = create_taxi_like_model_LR_relax(instance)
-    elif model_name == "ab_relax":
-        model, x, y, r, w, s, a, b = create_taxi_like_model_ab_relax(instance)
-    elif model_name == "ab_LR_relax":
-        model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR_relax(instance)
-    elif model_name == "ab_plat":
-        model, x, y, r, w, s, a, b, h = create_taxi_like_model_ab_plat(instance)
-    elif model_name == "ab_LR_plat":
-        model, x, y, r, L, R, s, a, b, h = create_taxi_like_model_ab_LR_plat(instance)
-    else:
-        raise ValueError(f"Unknown model_name: {model_name}")
+    if  model_name == "ab":
+        model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_ab(instance)
+    #elif model_name == "ab_LR":
+    #    model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR(instance)
+    #elif model_name == "ab_relax":
+    #    model, x, y, r, w, s, a, b = create_taxi_like_model_ab_relax(instance)
+    #elif model_name == "ab_LR_relax":
+    #    model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR_relax(instance)
+    #elif model_name == "ab_plat":
+        # deve restituire anche D, U, z, kappa, h
+    #    model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_taxi_like_model_ab_plat(instance)
+    #elif model_name == "ab_LR_plat":
+    #    # idem con L,R
+    #    model, x, y, r, L, R, s, a, b, D, U, z, kappa, h = create_taxi_like_model_ab_LR_plat(instance)
+    #else:
+    #    raise ValueError(f"Unknown model_name: {model_name}")
 
     configure_cplex(model)
 
@@ -221,7 +211,6 @@ def run_single_model(
     solve_time = time.perf_counter() - t_start_solve
     total_time = time.perf_counter() - t_start_total
 
-    #print("-" * 77)
     if solution:
         print(f"[EXP {exp_id} | model={model_name}] Status: {solution.solve_status}")
         print("Objective:", solution.objective_value)
@@ -241,24 +230,28 @@ def run_single_model(
     if solution is not None:
         save_solution_summary(solution, output_folder)
         try:
-            save_solution_variables_flex(solution=solution, output_folder=output_folder,
+            save_solution_variables_flex(
+                solution=solution,
+                output_folder=output_folder,
                 x=x,
                 y=y,
                 r=r,
-                w=w,   
+                w=w,
                 s=s,
                 L=L,
                 R=R,
                 a=a,
                 b=b,
-                h=h
+                h=h,
+                D=D,
+                U=U,
+                z_main=z,    # z[m,t] numero TRAIL attaccati
+                kappa=kappa, # κ[i,t] TRAIL parcheggiati
             )
         except TypeError:
+            # per compatibilità con vecchie versioni
             pass
 
-    # ----------------
-    # Served summary
-    # ----------------
     # ----------------
     # Served summary
     # ----------------
@@ -280,7 +273,6 @@ def run_single_model(
 
     print(f"[{model_name}] -> served: {served}/{total}  ({served_ratio*100:.1f}%)")
     print(f"[{model_name}] -> richieste servite (k): {served_requests}")
-
 
     # ----------------
     # Info solver
@@ -304,7 +296,7 @@ def run_single_model(
         # identificazione esperimento + modello
         "exp_id": exp_id,
         "model_name": model_name,
-        "num_Nw": instance.num_Nw, 
+        "num_Nw": instance.num_Nw,
 
         # --- experiment data ---
         "seed": seed,
@@ -314,9 +306,11 @@ def run_single_model(
         "dt": dt,
         "t_max": t_max,
         "num_modules": num_modules,
+        "num_trails": num_trails,
         "Q": Q,
         "c_km": c_km,
-        "c_uns_taxi": c_uns_taxi,
+        "c_uns": c_uns,
+        "g_plat": g_plat,
         "num_requests": num_requests,
         "served": served,
         "served_ratio": served_ratio,
@@ -330,6 +324,7 @@ def run_single_model(
         "A_size": len(instance.A),
         "K_size": len(instance.K),
         "M_size": len(instance.M),
+        "P_size": len(instance.P),
 
         # --- solver output ---
         "status": status,
@@ -347,11 +342,12 @@ def run_single_model(
     return result
 
 
+# ======================================================================
+#  RUN SINGLE MODEL - CITY
+# ======================================================================
 
-
-### CITY
 def run_single_model_city(
-    city:str,
+    city: str,
     instance: Instance,
     model_name: str,
     network_path,
@@ -360,9 +356,10 @@ def run_single_model_city(
     dt: int,
     horizon: int,
     num_modules: int,
+    num_trails: int,
     Q: int,
     c_km: float,
-    c_uns_taxi: float,
+    c_uns: float,
     g_plat: float,
     num_requests: int,
     q_min: int,
@@ -374,7 +371,7 @@ def run_single_model_city(
     base_output_folder,
 ) -> dict:
     """
-    Costruisce e risolve UNO dei modelli su una stessa Instance.
+    Costruisce e risolve UNO dei modelli su una stessa Instance (CITY).
     """
 
     # Sottocartella specifica per questo modello
@@ -382,29 +379,17 @@ def run_single_model_city(
     if not output_folder.exists():
         output_folder.mkdir(parents=True)
 
-    #print("-" * 80)
-    #print(f"[EXP {exp_id} | model={model_name}] Solving...")
-    #print("-" * 80)
-
     # ----------------
     # Costruzione modello
     # ----------------
     t_start_total = time.perf_counter()
 
     x = y = r = w = L = R = s = a = b = h = None
+    D = U = z = kappa = None
 
     if model_name == "ab":
-        model, x, y, r, w, s, a, b = create_taxi_like_model_ab(instance)
-    elif model_name == "ab_LR":
-        model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR(instance)
-    elif model_name == "ab_relax":
-        model, x, y, r, w, s, a, b = create_taxi_like_model_ab_relax(instance)
-    elif model_name == "ab_LR_relax":
-        model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR_relax(instance)
-    elif model_name == "ab_plat":
-        model, x, y, r, w, s, a, b, h = create_taxi_like_model_ab_plat(instance)
-    elif model_name == "ab_LR_plat":
-        model, x, y, r, L, R, s, a, b, h = create_taxi_like_model_ab_LR_plat(instance)
+        # nuovo modello MT che restituisce anche D,U,z,kappa,h
+        model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_ab(instance)
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
 
@@ -418,7 +403,6 @@ def run_single_model_city(
     solve_time = time.perf_counter() - t_start_solve
     total_time = time.perf_counter() - t_start_total
 
-    #print("-" * 77)
     if solution:
         print(f"[EXP {exp_id} | model={model_name}] Status: {solution.solve_status}")
         print("Objective:", solution.objective_value)
@@ -438,24 +422,29 @@ def run_single_model_city(
     if solution is not None:
         save_solution_summary(solution, output_folder)
         try:
-            save_solution_variables_flex(solution=solution, output_folder=output_folder,
+            save_solution_variables_flex(
+                solution=solution,
+                output_folder=output_folder,
                 x=x,
                 y=y,
                 r=r,
-                w=w,   
+                w=w,
                 s=s,
                 L=L,
                 R=R,
                 a=a,
                 b=b,
-                h=h
+                h=h,
+                D=D,
+                U=U,
+                z_main=z,   # z[m,t]
+                kappa=kappa,
             )
         except TypeError:
+            # compatibilità se la versione di save_solution_variables_flex
+            # non supporta ancora D,U,z_main,kappa
             pass
 
-    # ----------------
-    # Served summary
-    # ----------------
     # ----------------
     # Served summary
     # ----------------
@@ -477,7 +466,6 @@ def run_single_model_city(
 
     print(f"[{model_name}] -> served: {served}/{total}  ({served_ratio*100:.1f}%)")
     print(f"[{model_name}] -> richieste servite (k): {served_requests}")
-
 
     # ----------------
     # Info solver
@@ -501,7 +489,7 @@ def run_single_model_city(
         # identificazione esperimento + modello
         "exp_id": exp_id,
         "model_name": model_name,
-        "num_Nw": instance.num_Nw, 
+        "num_Nw": instance.num_Nw,
 
         # --- experiment data ---
         "seed": seed,
@@ -510,9 +498,11 @@ def run_single_model_city(
         "dt": dt,
         "t_max": t_max,
         "num_modules": num_modules,
+        "num_trails": num_trails,
         "Q": Q,
         "c_km": c_km,
-        "c_uns_taxi": c_uns_taxi,
+        "c_uns": c_uns,
+        "g_plat": g_plat,
         "num_requests": num_requests,
         "served": served,
         "served_ratio": served_ratio,
@@ -526,6 +516,7 @@ def run_single_model_city(
         "A_size": len(instance.A),
         "K_size": len(instance.K),
         "M_size": len(instance.M),
+        "P_size": len(instance.P),
 
         # --- solver output ---
         "status": status,
@@ -541,5 +532,3 @@ def run_single_model_city(
     }
 
     return result
-
-

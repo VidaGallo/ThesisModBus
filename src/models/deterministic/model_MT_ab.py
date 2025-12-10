@@ -27,17 +27,22 @@ def create_decision_variables_ab(mdl: Model, I: Instance):
     """
     Create all MILP decision variables for the taxi-like model.
     """
-
+    M = I.M
+    N = I.N
+    Nw = I.Nw
+    print("Nw:", Nw)
+    A = I.A
+    T = I.T
 
     # x[m,i,t]
     x = mdl.binary_var_dict(
-        keys=[(m, i, t) for m in I.M for i in I.N for t in I.T],
+        keys=[(m, i, t) for m in M for i in N for t in T],
         name="x"
     )
 
     # y[m,i,j,t]
     y = mdl.binary_var_dict(
-        keys=[(m, i, j, t) for m in I.M for (i, j) in I.A for t in I.T],
+        keys=[(m, i, j, t) for m in M for (i, j) in A for t in T],
         name="y"
     )
 
@@ -46,11 +51,10 @@ def create_decision_variables_ab(mdl: Model, I: Instance):
         keys=[(k, t, m)
               for k in I.K
               for t in I.DeltaT[k]
-              for m in I.M],
+              for m in M],
         name="r"
     )
 
-    print("Nw:", I.Nw)
     # w[k,i,t,m,mp] only for:
     #   - t ∈ ΔT_k (request is "alive")
     #   - i ∈ Nw (internal nodes where swaps are allowed)
@@ -59,10 +63,10 @@ def create_decision_variables_ab(mdl: Model, I: Instance):
             (k, i, t, m, mp)
             for k in I.K
             for t in I.DeltaT[k]
-            if (t > I.T[0]) and (t < I.T[-1])    # no excanges at the beginning and at the end
-            for i in I.Nw
-            for m in I.M
-            for mp in I.M
+            if (t > T[0]) and (t < T[-1])    # no exchanges at the beginning and at the end
+            for i in Nw
+            for m in M
+            for mp in M
             if m != mp
         ],
         name="w"
@@ -81,7 +85,7 @@ def create_decision_variables_ab(mdl: Model, I: Instance):
             (k, t, m)
             for k in I.K
             for t in I.DeltaT[k]
-            for m in I.M
+            for m in M
         ],
         name="a"
     )
@@ -92,13 +96,64 @@ def create_decision_variables_ab(mdl: Model, I: Instance):
             (k, t, m)
             for k in I.K
             for t in I.DeltaT[k]
-            for m in I.M
+            for m in M
         ],
         name="b"
     )
 
 
-    return x, y, r, w, s, a, b
+    Z_max = I.Z_max
+    P = I.P
+
+    # D[m,i,t] = n° TRAIL rilasciati dal MAIN m nel nodo i al tempo t
+    D = mdl.integer_var_dict(
+        keys=[(m, i, t)
+              for m in M
+              for i in Nw
+              for t in T
+              if t != T[0]],
+        lb=0,
+        ub=Z_max,
+        name="D"
+    )
+
+        # U[m,i,t] = n° TRAIL presi dal MAIN m nel nodo i al tempo t
+    U = mdl.integer_var_dict(
+        keys=[(m, i, t)
+              for m in M
+              for i in Nw
+              for t in T
+              if t != T[0]],
+        lb=0,
+        ub=Z_max,
+        name="U"
+    )
+
+    # z[m,t] = n° TRAIL attaccati al MAIN m al tempo t
+    z = mdl.integer_var_dict(
+        keys=[(m, t) for m in M for t in T],
+        lb=0,
+        ub=Z_max,
+        name="z"
+    )
+
+    # kappa[i,t] = n° TRAIL “parcheggiati” nel nodo di scambio i al tempo t
+    kappa = mdl.integer_var_dict(
+        keys=[(i, t) for i in Nw for t in T],
+        lb=0,
+        ub=len(P),
+        name="kappa"
+    )
+
+    # h[m,i,j,t] or h[i,j,t]
+    h = mdl.integer_var_dict(
+        keys=[(m, i, j, t) for m in M for (i, j) in A for t in T],
+        lb=0,
+        ub=Z_max+1,
+        name="h"
+    )
+
+    return x, y, r, w, s, a, b, D, U, z, kappa, h
 
 
 
@@ -106,7 +161,7 @@ def create_decision_variables_ab(mdl: Model, I: Instance):
 
 
 
-def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b):
+def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
     """
     Add all constraints of the taxi-like MILP model to the docplex model.
     """
@@ -114,6 +169,8 @@ def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b):
     Nw = I.Nw
     A = I.A
     M = I.M
+    Z_max = I.Z_max
+    P = I.P
     K = I.K
     T = I.T
     tau = I.tau_arc
@@ -126,6 +183,40 @@ def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b):
     # T = [1, 2, ..., t_max]
     t0 = T[0]           # first time period (1)
     T_pos = T[1:]       # all t > t0
+
+    depot = I.depot
+
+    # ------------------------------------------------------------------
+    # 0) Initial conditions:
+    #    ...
+    # ------------------------------------------------------------------ 
+    for m in M:
+        mdl.add_constraint(
+            x[m, depot, t0] == 1,
+            ctname=f"initial_position_at_depot_m{m}"
+        )
+    
+    # Tutti i moduli TRAIL sono connessi a qualche MAIN al tempo t0:
+    mdl.add_constraint(
+        mdl.sum(z[m, t0] for m in M) == len(P),
+        ctname="initial_trail_attached_t0"
+    )
+
+
+    # ------------------------------------------------------------------
+    # 0.bis) Z_max:
+    #    ...
+    # ------------------------------------------------------------------ 
+    # Nessun MAIN può avere più di Z_max moduli TRAIL:
+    Z_max = I.Z_max
+    for m in M:
+        for t in T:
+            mdl.add_constraint(
+                z[m, t] <= Z_max,
+                ctname=f"z_upper_bound_m{m}_t{t}"
+            )
+
+
 
 
     # ------------------------------------------------------------------
@@ -169,7 +260,7 @@ def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b):
     for m in M:
         for i in N:
             outgoing = [ (u,v) for (u,v) in A if u == i ]
-            incoming = [ (h,v) for (h,v) in A if v == i ]
+            incoming = [ (hh,v) for (hh,v) in A if v == i ]
 
             for t in T_pos:   # t > t0
                 lhs = x[m, i, t]
@@ -183,11 +274,11 @@ def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b):
 
                 # + sum_{h:(h,i)∈A, t - tau(h,i) >= t0} y[m,h,i,t - tau(h,i)]
                 incoming_terms = []
-                for (h, i2) in incoming:
-                    travel = tau[(h, i)]
+                for (hh, i2) in incoming:
+                    travel = tau[(hh, i)]
                     t_depart = t - travel
                     if t_depart >= t0:
-                        incoming_terms.append(y[m, h, i, t_depart])
+                        incoming_terms.append(y[m, hh, i, t_depart])
                 if incoming_terms:
                     rhs += mdl.sum(incoming_terms)
 
@@ -196,23 +287,13 @@ def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b):
                     ctname=f"move_consistency_m{m}_i{i}_t{t}"
                 )
 
-    # ------------------------------------------------------------------
-    # 4) Initial condition:
-    #    All modules start at the depot node (node 0) at time t0.
-    # ------------------------------------------------------------------
-    depot = I.depot
 
-    for m in M:
-        mdl.add_constraint(
-            x[m, depot, t0] == 1,
-            ctname=f"initial_position_at_depot_m{m}"
-        )
 
 
 
     # ------------------------------------------------------------------
-    # 5) Module capacity:
-    #    sum_{k∈K} q_k * r[k,t,m] <= Q  ∀m,t
+    # 4) Module capacity with TRAIL:
+    #    sum_{k∈K} q_k * r[k,t,m] <= Q * (1 + z[m,t])   ∀m,t
     #    (only k s.t. (k,t,m) exists in r)
     # ------------------------------------------------------------------
     for m in M:
@@ -222,10 +303,95 @@ def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b):
                     q[k] * r[k, t, m]
                     for k in K
                     if (k, t, m) in r
-                ) <= Q,
-                ctname=f"capacity_m{m}_t{t}"
+                ) <= Q * (1 + z[m, t]),
+                ctname=f"capacity_with_trail_m{m}_t{t}"
             )
 
+    # ------------------------------------------------------------------
+    # 5) SCAMBIO MODULI TRAIL (D, U, z, kappa)
+    # ------------------------------------------------------------------
+    
+    Z_max = I.Z_max
+    t0 = T[0]
+
+    # 5.1) Lo scambio può avvenire solo se si ha qualche TRAIL da scambiare
+    #    D^m_{i,t} <= z^m_t              ∀ m∈M, i∈Nw, t∈T \ {t0}
+    for m in M:
+        for t in T:
+            if t == t0:
+                continue
+            for i in Nw:
+                mdl.add_constraint(
+                    D[m, i, t] <= z[m, t],
+                    ctname=f"D_le_z_m{m}_i{i}_t{t}"
+                )
+
+    # 5.2) Il MAIN deve essere presente in quel nodo per poter rilasciare TRAIL
+    #    D^m_{i,t} <= Z_max * x^m_{i,t}  ∀ m∈M, i∈Nw, t∈T \ {t0}
+    for m in M:
+        for t in T:
+            if t == t0:
+                continue
+            for i in Nw:
+                mdl.add_constraint(
+                    D[m, i, t] <= Z_max * x[m, i, t],
+                    ctname=f"D_le_Zx_m{m}_i{i}_t{t}"
+                )
+
+    # 5.3) Un MAIN può ricevere TRAIL solo se si trova in quel nodo
+    #    U^m_{i,t} <= Z_max * x^m_{i,t}  ∀ m∈M, i∈Nw, t∈T \ {t0}
+    for m in M:
+        for t in T:
+            if t == t0:
+                continue
+            for i in Nw:
+                mdl.add_constraint(
+                    U[m, i, t] <= Z_max * x[m, i, t],
+                    ctname=f"U_le_Zx_m{m}_i{i}_t{t}"
+                )
+
+    # 5.4) Conservazione scambio TRAIL nel nodo:
+    #    ∑_m U^m_{i,t} <= ∑_m D^m_{i,t} + κ_{i,t-1}
+    #    ∀ i∈Nw, t∈T \ {t0}
+    for i in Nw:
+        for t in T:
+            if t == t0:
+                continue
+            mdl.add_constraint(
+                mdl.sum(U[m, i, t] for m in M)
+                <= mdl.sum(D[m, i, t] for m in M) + kappa[i, t-1],
+                ctname=f"trail_conservation_node_i{i}_t{t}"
+            )
+
+    # 5.5) Dinamica di z^m_t:
+    #    z^m_t = z^m_{t-1} - ∑_{i∈Nw} D^m_{i,t} + ∑_{i∈Nw} U^m_{i,t}
+    #    ∀ m∈M, t∈T \ {t0}
+    for m in M:
+        for t in T:
+            if t == t0:
+                continue
+            mdl.add_constraint(
+                z[m, t] ==
+                z[m, t-1]
+                - mdl.sum(D[m, i, t] for i in Nw)
+                + mdl.sum(U[m, i, t] for i in Nw),
+                ctname=f"z_balance_m{m}_t{t}"
+            )
+
+    # 5.6) Disponibilità di TRAIL nel nodo i:
+    #    κ_{i,t} = κ_{i,t-1} + ∑_m D^m_{i,t} - ∑_m U^m_{i,t}
+    #    ∀ i∈Nw, t∈T \ {t0}
+    for i in Nw:
+        for t in T:
+            if t == t0:
+                continue
+            mdl.add_constraint(
+                kappa[i, t] ==
+                kappa[i, t-1]
+                + mdl.sum(D[m, i, t] for m in M)
+                - mdl.sum(U[m, i, t] for m in M),
+                ctname=f"kappa_balance_i{i}_t{t}"
+            )
 
 
     # ------------------------------------------------------------------
@@ -520,11 +686,38 @@ def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b):
                     b[k, t, m] <= r[k, t_prev, m],
                     ctname=f"b_prev_state_k{k}_t{t}_m{m}"
                 )
+    # ------------------------------------------------------------------
+    # 11) Linearization h[m,i,j,t]
+    # ------------------------------------------------------------------ 
+    # h[m,i,j,t] <= (Z_max + 1) * y[m,i,j,t]
+    for m in M:
+        for (i, j) in A:
+            for t in T:
+                mdl.add_constraint(
+                    h[m, i, j, t] <= (Z_max + 1) * y[m, i, j, t],
+                    ctname=f"h_le_bigM_y_m{m}_i{i}_j{j}_t{t}"
+                )
+    # h[m,i,j,t] <= z[m,t] + 1
+    for m in M:
+        for (i, j) in A:
+            for t in T:
+                mdl.add_constraint(
+                    h[m, i, j, t] <= z[m, t] + 1,
+                    ctname=f"h_le_zplus1_m{m}_i{i}_j{j}_t{t}"
+                )
+    # h[m,i,j,t] >= (z[m,t] + 1) - (Z_max + 1) * (1 - y[m,i,j,t])
+    for m in M:
+        for (i, j) in A:
+            for t in T:
+                mdl.add_constraint(
+                    h[m, i, j, t] >= (z[m, t] + 1) - (Z_max + 1) * (1 - y[m, i, j, t]),
+                    ctname=f"h_ge_zplus1_bigM_m{m}_i{i}_j{j}_t{t}"
+                )
 
 
 
 
-def add_taxi_like_objective_ab(mdl, I, y, s):
+def add_taxi_like_objective_ab(mdl, I, h, s):
     """
     Add the full taxi-like MILP objective function:
         min ( C_oper + C_uns )
@@ -535,8 +728,8 @@ def add_taxi_like_objective_ab(mdl, I, y, s):
     I   : Instance
         Data container with sets and parameters.
 
-    y : docplex binary var dict
-        y[m,i,j,t] = 1 if module m departs from i to j at time t
+    h : docplex integer var dict
+        h[m,i,j,t] = number if modules main + trail m departs from i to j at time t
 
     s : docplex binary var dict
         s[k] = 1 if request k is served
@@ -544,10 +737,10 @@ def add_taxi_like_objective_ab(mdl, I, y, s):
 
     # -------------------------
     # 1) Operational cost
-    #     C_oper = c_km * sum_m,i,j,t gamma(i,j) * y(m,i,j,t)
+    #     C_oper = c_km * sum_m,i,j,t gamma(i,j) * h(m,i,j,t)
     # -------------------------
     C_oper = I.c_km * mdl.sum(
-        I.gamma[(i, j)] * y[m, i, j, t]
+        I.gamma[(i, j)] * h[m, i, j, t]
         for m in I.M
         for (i, j) in I.A
         for t in I.T
@@ -558,7 +751,7 @@ def add_taxi_like_objective_ab(mdl, I, y, s):
     #     C_uns = c_uns * sum_k q_k * (1 - s_k)
     # -------------------------
     C_uns = mdl.sum(
-        I.c_uns_taxi * I.q[k] * (1 - s[k])
+        I.c_uns * I.q[k] * (1 - s[k])
         for k in I.K
     )
 
@@ -576,7 +769,7 @@ def add_taxi_like_objective_ab(mdl, I, y, s):
 
 
 
-def create_taxi_like_model_ab(I: Instance):
+def create_MT_model_ab(I: Instance):
     """
     Create:
         - Model()
@@ -588,15 +781,15 @@ def create_taxi_like_model_ab(I: Instance):
     mdl = Model(name="TaxiLike")
 
     # 1) variables
-    x, y, r, w, s, a, b = create_decision_variables_ab(mdl, I)
+    x, y, r, w, s, a, b, D, U, z, kappa,h = create_decision_variables_ab(mdl, I)
 
     # 2) constraints
-    add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b)
+    add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa,h)
 
     # 3) objective
-    add_taxi_like_objective_ab(mdl, I, y, s)
+    add_taxi_like_objective_ab(mdl, I, h, s)
 
-    return mdl, x, y, r, w, s, a, b
+    return mdl, x, y, r, w, s, a, b, D, U, z, kappa,h
 
 
 
