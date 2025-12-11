@@ -2,6 +2,7 @@ from utils.MT.runs_fun import *
 
 import pandas as pd
 from pathlib import Path
+from collections import Counter
 
 
 # seed
@@ -19,8 +20,8 @@ if __name__ == "__main__":
     # ----------------
     # Base params 
     # ----------------
-    horizon =60    # minuti
-    dt = 5
+    horizon =108    # minuti
+    dt = 6
     depot = 0
 
     Q = 10
@@ -28,17 +29,17 @@ if __name__ == "__main__":
     c_uns = 100
     g_plat = None    # or None
 
-    num_Nw = 2    # n°nodi che permettono lo scambio
+    num_Nw = 3    # n°nodi che permettono lo scambio
 
     q_min = 1
     q_max = 10
-    slack_min = 10.0
+    slack_min = 20.0
 
     # Parametri SPECIFICI
-    number        = 3      # lato griglia
+    number        = 4      # lato griglia
     num_modules   = 3
     num_trails    = 6
-    num_requests  = 10
+    num_requests  = 30
     
 
     # I quattro modelli da confrontare
@@ -51,6 +52,7 @@ if __name__ == "__main__":
     print(f"EXPERIMENT {exp_id}")
     print(f"  number        = {number}")
     print(f"  horizon       = {horizon}")
+    print(f"  dt            = {dt}")
     print(f"  num_main   = {num_modules}")
     print(f"  num_trail   = {num_trails}")
     print(f"  num_requests  = {num_requests}")
@@ -75,6 +77,19 @@ if __name__ == "__main__":
         seed=seed,
         num_Nw=num_Nw
     )
+
+    
+    # --- Controllo: conteggio capacità delle richieste (q_k) ---
+    cap_list = [instance.q[k] for k in instance.K]
+    cap_counts = Counter(cap_list)
+    print("\nRequest capacity counts:")
+    for i in [1, 2, 3, 4]:
+        print(f"  q={i}: {cap_counts.get(i, 0)}")
+    gt4 = sum(v for k, v in cap_counts.items() if k > 4)
+    print(f"  q>4: {gt4}")
+    print(f"  full distribution: {dict(sorted(cap_counts.items()))}")
+
+
     # 2) cartella base per l'esperimento
     base_folder = build_output_folder(
         base_dir="results",
