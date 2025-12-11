@@ -31,7 +31,15 @@ __pycache__/
 # Results (heavy files)
 # -------------------------
 results/GRID/*
+results/*
 !results/GRID/.gitkeep
 
 results/CITY/*
 !results/CITY/.gitkeep
+
+
+# -------------------------
+# Instance
+# -------------------------
+
+instances/*
