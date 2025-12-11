@@ -290,8 +290,9 @@ def plot_city_suburb_network(
     plt.tight_layout()
 
     # Save to specific folder
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, filename)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / filename
     plt.savefig(output_path, dpi=500)
     print(f"Saved plot as {output_path}")
 
@@ -305,7 +306,7 @@ def generate_city_network_raw(
     k_lateral: int = 2,      
     k_center: int = 4,
     central_suburbs: list = None,
-    output_dir: str = "/home/vida/Desktop/TESI/thesis_code/instances/CITY/TORINO_SUB",
+    output_dir: str = "instances/CITY/TORINO_SUB",
     filename: str = "torino_suburbs_raw.png",
 ) -> tuple[dict, nx.MultiDiGraph]:
     """
@@ -565,7 +566,7 @@ def generate_city_network_merged(
     merge_groups: list[tuple[str, ...]],
     place: str,
     plot: bool = True,
-    output_dir: str = "/home/vida/Desktop/TESI/thesis_code/instances/CITY/TORINO_SUB",
+    output_dir: str = "instances/CITY/TORINO_SUB",
     filename: str = "torino_suburbs_merged.png",
 ) -> dict:
     """
@@ -693,7 +694,7 @@ def generate_city_network_reworked(
     add_edges: list[tuple[object, object]] | None = None,
     default_speed_kmh: float | None = None,
     plot: bool = True,
-    output_dir: str = "/home/vida/Desktop/TESI/thesis_code/instances/CITY/TORINO_SUB",
+    output_dir: str = "instances/CITY/TORINO_SUB",
     filename: str = "torino_suburbs_final.png",
 ) -> dict:
     """
@@ -975,12 +976,12 @@ def generate_grid_network_city(
 
 
 
-
+"""
 ### TEST MAIN ###
 if __name__ == "__main__":
     place = "Torino, Italia",
     name = "Torino",
-    city_output_folder = "/home/vida/Desktop/TESI/thesis_code/instances/CITY/TORINO_SUB",
+    city_output_folder = "instances/CITY/TORINO_SUB",
     central_suburbs = ["Centro", "Crocetta", "Santa Rita", "Aurora"],
 
     # 1) RAW network
@@ -1066,6 +1067,4 @@ if __name__ == "__main__":
     )
 
 
-
-
-
+"""

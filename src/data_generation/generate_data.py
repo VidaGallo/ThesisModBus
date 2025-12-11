@@ -56,10 +56,10 @@ def generate_all_data(
     Path(base).mkdir(parents=True, exist_ok=True)
 
     network_cont = f"{base}/network.json"
-    requests_cont = f"{base}/taxi_like_requests_{horizon}maxmin.json"
+    requests_cont = f"{base}/requests_{horizon}maxmin.json"
 
     network_disc = f"{base}/network_disc{dt}min.json"
-    requests_disc = f"{base}/taxi_like_requests_{horizon}maxmin_disc{dt}min.json"
+    requests_disc = f"{base}/requests_{horizon}maxmin_disc{dt}min.json"
 
 
     ### GENERATE CONTINUOUS NETWORK
@@ -135,10 +135,10 @@ def generate_all_data_asym(
     Path(base).mkdir(parents=True, exist_ok=True)
 
     network_cont = f"{base}/network.json"
-    requests_cont = f"{base}/taxi_like_requests_{horizon}maxmin.json"
+    requests_cont = f"{base}/requests_{horizon}maxmin.json"
 
     network_disc = f"{base}/network_disc{dt}min.json"
-    requests_disc = f"{base}/taxi_like_requests_{horizon}maxmin_disc{dt}min.json"
+    requests_disc = f"{base}/requests_{horizon}maxmin_disc{dt}min.json"
 
 
     ### GENERATE CONTINUOUS NETWORK
@@ -221,10 +221,10 @@ def generate_all_data_city(
     Path(base).mkdir(parents=True, exist_ok=True)
 
     network_cont = f"{base}/network.json"
-    requests_cont = f"{base}/taxi_like_requests_{horizon}maxmin.json"
+    requests_cont = f"{base}/requests_{horizon}maxmin.json"
 
     network_disc = f"{base}/network_disc{dt}min.json"
-    requests_disc = f"{base}/taxi_like_requests_{horizon}maxmin_disc{dt}min.json"
+    requests_disc = f"{base}/requests_{horizon}maxmin_disc{dt}min.json"
 
 
     ### GENERATE CONTINUOUS NETWORK

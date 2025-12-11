@@ -40,12 +40,12 @@ if __name__ == "__main__":
 
     q_min = 1
     q_max = 10
-    slack_min = 20.0
+    slack_min = 30.0
 
     # Parametri SPECIFICI
     num_modules   = 3
     num_trails    = 6
-    num_requests  = 30
+    num_requests  = 25
     
 
     # I modelli da confrontare
