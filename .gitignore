@@ -12,7 +12,8 @@ ENV/
 venv/
 VENV/
 
-# Python cache files
+# Python and cache files
+cache/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -32,16 +33,19 @@ __pycache__/
 # -------------------------
 # Results (heavy files)
 # -------------------------
-results/GRID/*
 results/*
+results/
+
+results/GRID/*
 !results/GRID/.gitkeep
 
 results/CITY/*
 !results/CITY/.gitkeep
 
 
+
 # -------------------------
 # Instance
 # -------------------------
-
 instances/*
+instances/

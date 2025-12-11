@@ -40,11 +40,10 @@ ThesisModBus/
 └── src/  
     ├── models/  
     │   ├── deterministic/  
-    │   │   ├── taxi_like.mod  
-    │   │   └── general.mod  
+    │   │   ├── ...
     │   │  
     │   └── stochastic/  
-    │       └──general_two_stage.mod  
+    │       ├── ..  
     │  
     │  
     ├── data_generation/  
@@ -55,7 +54,9 @@ ThesisModBus/
     │  
     │  
     ├── utils/  
-    │   ├── cplex_config.py        &nbsp;&nbsp;# CPLEX configurations for the solver of the model  
+    │   ├── MT       &nbsp;&nbsp;#
+    
+        cplex_config.py        &nbsp;&nbsp;# CPLEX configurations for the solver of the model  
     │   ├── instance.py            &nbsp;&nbsp;# class Instance  
     │   ├── loaders.py             &nbsp;&nbsp;# function to load the Parameters  
     |   ├── outputs.py             &nbsp;&nbsp;# savign and managin outputs  

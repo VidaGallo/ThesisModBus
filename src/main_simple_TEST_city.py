@@ -132,8 +132,11 @@ if __name__ == "__main__":
         f"K{num_requests}_"
         f"Nw{num_Nw}.csv"
     )
-    summary_path = Path("results/CITY/TORINO_SUB/summary") / summary_name
+    
+    summary_dir = Path("results/CITY/simple/summary")
+    summary_dir.mkdir(parents=True, exist_ok=True)
 
+    summary_path = summary_dir / summary_name
     df_results.to_csv(summary_path, index=False)
 
     #print(f"\nSummary saved to: {summary_path}")

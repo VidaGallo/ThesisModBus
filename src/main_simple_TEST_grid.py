@@ -126,8 +126,10 @@ if __name__ == "__main__":
         f"K{num_requests}_"
         f"Nw{num_Nw}_4models.csv"
     )
-    summary_path = Path("results/GRID/summary") / summary_name
+    summary_dir = Path("results/GRID/simple/summary")
+    summary_dir.mkdir(parents=True, exist_ok=True)
 
+    summary_path = summary_dir / summary_name
     df_results.to_csv(summary_path, index=False)
 
     #print(f"\nSummary saved to: {summary_path}")

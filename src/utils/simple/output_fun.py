@@ -29,10 +29,10 @@ def build_output_folder(base_dir: str, network_path: str, t_max: int, dt: int):
 
     Example:
         base_dir = "results"
-        network_path = "instances/GRID/5x5/network_disc5min.json"
+        network_path = "instances/GRID/simple/5x5/network_disc5min.json"
 
     Result folder:
-        results/GRID/5x5/tmax100_dt5/
+        results/GRID/simple/5x5/tmax100_dt5/
     """
 
     net = Path(network_path)
@@ -41,7 +41,7 @@ def build_output_folder(base_dir: str, network_path: str, t_max: int, dt: int):
     network_dir = net.parent.name      # ex."5x5"
     network_group = net.parent.parent.name   # ex."GRID"
 
-    folder = Path(base_dir) / network_group / network_dir / f"tmax{t_max*dt}_dt{dt}"
+    folder = Path(base_dir) / network_group / "simple" / network_dir / f"tmax{t_max*dt}_dt{dt}"
     if not folder.exists():
         folder.mkdir(parents=True)
 

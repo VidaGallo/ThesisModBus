@@ -46,7 +46,7 @@ if __name__ == "__main__":
     model_names = ["ab"]    # ["base", "base_relax", "LR", "LR_relax" , "ab", "ab_relax", "ab_plat", "ab_LR", "ab_LR_relax", "ab_LR_plat"]
 
     all_results = []
-    exp_id = f"n{number}_h{horizon}_m{num_modules}_r{num_requests}"
+    exp_id = f"grid_n{number}_h{horizon}_m{num_modules}_r{num_requests}"
 
     print("\n" + "="*80)
     print(f"EXPERIMENT {exp_id}")
@@ -98,8 +98,8 @@ if __name__ == "__main__":
         dt=instance.dt,
     )
     base_folder = base_folder / f"{exp_id}"
-    if not base_folder.exists():
-        base_folder.mkdir(parents=True)
+    base_folder.mkdir(parents=True, exist_ok=True)
+
 
     # 3) lancia i modelli sulla stessa instance
     for model_name in model_names:
@@ -142,10 +142,12 @@ if __name__ == "__main__":
         f"H{horizon}_"
         f"M{num_modules}_"
         f"K{num_requests}_"
-        f"Nw{num_Nw}_models.csv"   # <<< cambiato il suffisso (non più 4models fisso)
+        f"Nw{num_Nw}_models.csv"   
     )
-    summary_path = Path("results/GRID/summary") / summary_name
+    summary_dir = Path("results/GRID/MT/summary")
+    summary_dir.mkdir(parents=True, exist_ok=True)
 
+    summary_path = summary_dir / summary_name
     df_results.to_csv(summary_path, index=False)
 
     #print(f"\nSummary saved to: {summary_path}")
