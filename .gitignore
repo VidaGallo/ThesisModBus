@@ -5,6 +5,8 @@
 .venv*
 .venv310/
 .venv3103/
+venv310/
+venv3103/
 env/
 ENV/
 venv/
