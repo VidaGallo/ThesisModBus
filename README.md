@@ -54,15 +54,23 @@ ThesisModBus/
     │  
     │  
     ├── utils/  
-    │   ├── MT       &nbsp;&nbsp;#
-    
-        cplex_config.py        &nbsp;&nbsp;# CPLEX configurations for the solver of the model  
-    │   ├── instance.py            &nbsp;&nbsp;# class Instance  
-    │   ├── loaders.py             &nbsp;&nbsp;# function to load the Parameters  
-    |   ├── outputs.py             &nbsp;&nbsp;# savign and managin outputs  
-    │   └── print_data.py          &nbsp;&nbsp;# function to print info  
+    │   ├── MT       &nbsp;&nbsp;# Main-Trail model  
+    │   │   ├── cplex_config.py       &nbsp;&nbsp;# CPLEX configurations for the solver     
+    │   │   ├── instance_def.py       &nbsp;&nbsp;# class Instance   
+    │   │   ├── loader_fun.py         &nbsp;&nbsp;# function to load the Parameters    
+    |   │   ├── output_fun.py         &nbsp;&nbsp;# savign and managin outputs    
+    │   │   ├── print_fun.py          &nbsp;&nbsp;# function to print info   
+    │   │   └── runs_fun              &nbsp;&nbsp;# function to run the tests  
+    │   └── Simple    &nbsp;&nbsp;# Simple model
+    │       ├── cplex_config.py       &nbsp;&nbsp;# CPLEX configurations for the solver      
+    │       ├── instance_def.py       &nbsp;&nbsp;# class Instance    
+    │       ├── loader_fun.py         &nbsp;&nbsp;# function to load the Parameters     
+    |       ├── output_fun.py         &nbsp;&nbsp;# savign and managin outputs     
+    │       ├── print_fun.py          &nbsp;&nbsp;# function to print info   
+    │       └── runs_fun              &nbsp;&nbsp;# function to run the test    
     │  
     │  
     │  
-    ├── main_taxi_like_test.py     &nbsp;&nbsp;# multiple tests with multiple instances  
-    └── main_taxi_like.py          &nbsp;&nbsp;# simple main  
+    ├── main_MT_grid.py               &nbsp;&nbsp;# main for the "Main-Trail" model on a grid   
+    ├── main_simple_city.py           &nbsp;&nbsp;# main for the "Simple" model on a city   
+    └── main_simple_grid.py           &nbsp;&nbsp;# main for the "Simple" model on a grid 

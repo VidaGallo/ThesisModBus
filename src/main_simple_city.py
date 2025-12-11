@@ -33,19 +33,19 @@ if __name__ == "__main__":
     c_uns_taxi = 100
     g_plat = None    # or None
 
-    num_Nw = 2    # n°nodi che permettono lo scambio
+    num_Nw = 3    # n°nodi che permettono lo scambio
 
     q_min = 1
     q_max = 10
     slack_min = 20.0
 
     # Parametri SPECIFICI
-    num_modules   = 1
-    num_requests  = 20
+    num_modules   = 3
+    num_requests  = 15
     
 
     # I modelli da confrontare
-    model_names = ["ab",  "ab_LR"]    # ["base", "base_relax", "LR", "LR_relax" , "ab", "ab_relax", "ab_plat", "ab_LR", "ab_LR_relax", "ab_LR_plat"]
+    model_names = ["ab"]  
 
     all_results = []
     exp_id = f"{city}_h{horizon}_m{num_modules}_r{num_requests}"
