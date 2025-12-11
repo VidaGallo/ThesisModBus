@@ -27,7 +27,7 @@ if __name__ == "__main__":
     Q = 10
     c_km = 1.0
     c_uns = 100
-    g_plat = None    # or None
+    g_plat = None
 
     num_Nw = 3    # n°nodi che permettono lo scambio
 
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     
 
     # I quattro modelli da confrontare
-    model_names = ["ab"]    # ["base", "base_relax", "LR", "LR_relax" , "ab", "ab_relax", "ab_plat", "ab_LR", "ab_LR_relax", "ab_LR_plat"]
+    model_names = ["ab"] 
 
     all_results = []
     exp_id = f"grid_n{number}_h{horizon}_m{num_modules}_r{num_requests}"
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     base_folder.mkdir(parents=True, exist_ok=True)
 
 
-    # 3) lancia i modelli sulla stessa instance
+    # 3) Lanciare i modelli sulla stessa instance
     for model_name in model_names:
         print("\n")
         res = run_single_model(

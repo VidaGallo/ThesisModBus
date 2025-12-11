@@ -84,7 +84,7 @@ if __name__ == "__main__":
     if not base_folder.exists():
         base_folder.mkdir(parents=True)
 
-    # 3) lancia i 4 modelli sulla stessa instance
+    # 3) Lanciare i modelli sulla stessa instance
     for model_name in model_names:
         print("\n")
         res = run_single_model(

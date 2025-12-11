@@ -1,7 +1,8 @@
-from utils.simple.runs_fun import *
+from utils.MT.runs_fun import *
 
 import pandas as pd
 from pathlib import Path
+from collections import Counter
 
 
 # seed
@@ -21,17 +22,19 @@ if __name__ == "__main__":
     subdir = "TORINO_SUB"
     central_suburbs =   ["Centro", "Crocetta", "Santa Rita", "Aurora"]
 
+
     # ----------------
     # Base params 
     # ----------------
-    horizon = 100    # minuti
-    dt = 5
+    horizon =108    # minuti
+    dt = 6
     depot = 1198867366   # Centro Torino
 
     Q = 10
     c_km = 1.0
-    c_uns_taxi = 100
-    g_plat = None    # or None
+    c_uns = 100
+    g_plat = None
+
 
     num_Nw = 3    # n°nodi che permettono lo scambio
 
@@ -41,11 +44,12 @@ if __name__ == "__main__":
 
     # Parametri SPECIFICI
     num_modules   = 3
-    num_requests  = 20
+    num_trails    = 6
+    num_requests  = 30
     
 
     # I modelli da confrontare
-    model_names = ["ab"]     # ["ab_LR"]
+    model_names = ["ab"]
 
     all_results = []
     exp_id = f"{city}_h{horizon}_m{num_modules}_r{num_requests}"
@@ -66,9 +70,10 @@ if __name__ == "__main__":
         horizon=horizon,
         dt=dt,
         num_modules=num_modules,
+        num_trails=num_trails,
         Q=Q,
         c_km=c_km,
-        c_uns_taxi=c_uns_taxi,
+        c_uns=c_uns,
         g_plat=g_plat,
         num_requests=num_requests,
         q_min=q_min,
@@ -79,6 +84,18 @@ if __name__ == "__main__":
         num_Nw=num_Nw
     )
 
+    
+    # --- Controllo: conteggio capacità delle richieste (q_k) ---
+    cap_list = [instance.q[k] for k in instance.K]
+    cap_counts = Counter(cap_list)
+    print("\nRequest capacity counts:")
+    for i in [1, 2, 3, 4]:
+        print(f"  q={i}: {cap_counts.get(i, 0)}")
+    gt4 = sum(v for k, v in cap_counts.items() if k > 4)
+    print(f"  q>4: {gt4}")
+    print(f"  full distribution: {dict(sorted(cap_counts.items()))}")
+
+
     # 2) cartella base per l'esperimento
     base_folder = build_output_folder(
         base_dir="results",
@@ -87,8 +104,8 @@ if __name__ == "__main__":
         dt=instance.dt,
     )
     base_folder = base_folder / f"{exp_id}"
-    if not base_folder.exists():
-        base_folder.mkdir(parents=True)
+    base_folder.mkdir(parents=True, exist_ok=True)
+
 
     # 3) Lanciare i modelli sulla stessa instance
     for model_name in model_names:
@@ -103,9 +120,10 @@ if __name__ == "__main__":
             dt=dt,
             horizon=horizon,
             num_modules=num_modules,
+            num_trails=num_trails,
             Q=Q,
             c_km=c_km,
-            c_uns_taxi=c_uns_taxi,
+            c_uns=c_uns,
             g_plat=g_plat,
             num_requests=num_requests,
             q_min=q_min,
@@ -132,8 +150,7 @@ if __name__ == "__main__":
         f"K{num_requests}_"
         f"Nw{num_Nw}.csv"
     )
-    
-    summary_dir = Path("results/CITY/simple/summary")
+    summary_dir = Path("results/CITY/MT/summary")
     summary_dir.mkdir(parents=True, exist_ok=True)
 
     summary_path = summary_dir / summary_name
