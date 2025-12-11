@@ -9,14 +9,8 @@ from data_generation.generate_data import *
 import time
 
 
-from models.deterministic.model_simple_ab import *
-from models.deterministic.model_simple_ab_LR import *
-
-from models.deterministic.model_simple_ab_relax import *
-from models.deterministic.model_simple_ab_LR_relax import *
-
-from models.deterministic.model_simple_ab_plat import *
-from models.deterministic.model_simple_ab_LR_plat import *
+from models.deterministic.model_simple_w import *
+from models.deterministic.model_simple_LR import *
 
 
 # seed
@@ -193,14 +187,14 @@ def run_single_model(
         model, x, y, r, w, s, a, b = create_taxi_like_model_ab(instance)
     elif model_name == "ab_LR":
         model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR(instance)
-    elif model_name == "ab_relax":
-        model, x, y, r, w, s, a, b = create_taxi_like_model_ab_relax(instance)
-    elif model_name == "ab_LR_relax":
-        model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR_relax(instance)
-    elif model_name == "ab_plat":
-        model, x, y, r, w, s, a, b, h = create_taxi_like_model_ab_plat(instance)
-    elif model_name == "ab_LR_plat":
-        model, x, y, r, L, R, s, a, b, h = create_taxi_like_model_ab_LR_plat(instance)
+    #elif model_name == "ab_relax":
+    #    model, x, y, r, w, s, a, b = create_taxi_like_model_ab_relax(instance)
+    #elif model_name == "ab_LR_relax":
+    #    model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR_relax(instance)
+    #elif model_name == "ab_plat":
+    #    model, x, y, r, w, s, a, b, h = create_taxi_like_model_ab_plat(instance)
+    #elif model_name == "ab_LR_plat":
+    #    model, x, y, r, L, R, s, a, b, h = create_taxi_like_model_ab_LR_plat(instance)
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
 
@@ -390,16 +384,16 @@ def run_single_model_city(
         model, x, y, r, w, s, a, b = create_taxi_like_model_ab(instance)
     elif model_name == "ab_LR":
         model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR(instance)
-    elif model_name == "ab_relax":
-        model, x, y, r, w, s, a, b = create_taxi_like_model_ab_relax(instance)
-    elif model_name == "ab_LR_relax":
-        model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR_relax(instance)
-    elif model_name == "ab_plat":
-        model, x, y, r, w, s, a, b, h = create_taxi_like_model_ab_plat(instance)
-    elif model_name == "ab_LR_plat":
-        model, x, y, r, L, R, s, a, b, h = create_taxi_like_model_ab_LR_plat(instance)
-    else:
-        raise ValueError(f"Unknown model_name: {model_name}")
+    #elif model_name == "ab_relax":
+    #    model, x, y, r, w, s, a, b = create_taxi_like_model_ab_relax(instance)
+    #elif model_name == "ab_LR_relax":
+    #    model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR_relax(instance)
+    #elif model_name == "ab_plat":
+    #    model, x, y, r, w, s, a, b, h = create_taxi_like_model_ab_plat(instance)
+    #elif model_name == "ab_LR_plat":
+    #    model, x, y, r, L, R, s, a, b, h = create_taxi_like_model_ab_LR_plat(instance)
+    #else:
+    #    raise ValueError(f"Unknown model_name: {model_name}")
 
     configure_cplex(model)
 

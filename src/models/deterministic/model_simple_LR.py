@@ -11,7 +11,7 @@ Taxi-like deterministic MILP model
 
 from typing import Dict, Tuple
 from docplex.mp.model import Model
-from utils.instance_def import Instance
+from utils.simple.instance_def import Instance
 
 
 # seed
@@ -23,7 +23,7 @@ np.random.seed(seed)
 
 
 
-def create_decision_variables_ab_LR_plat(mdl: Model, I: Instance):
+def create_decision_variables_ab_LR(mdl: Model, I: Instance):
     """
     Create all MILP decision variables for the taxi-like model.
     """
@@ -107,15 +107,7 @@ def create_decision_variables_ab_LR_plat(mdl: Model, I: Instance):
         name="b"
     )
 
-    # h[i,j,t]: numero di moduli che percorrono l'arco (i,j) al tempo t
-    h = mdl.integer_var_dict(
-        keys=[(i, j, t) for (i, j) in I.A for t in I.T],
-        lb=0,
-        ub=len(I.M),
-        name="h"
-    )
-
-    return x, y, r, L, R, s, a, b, h
+    return x, y, r, L, R, s, a, b
 
 
 
@@ -123,7 +115,7 @@ def create_decision_variables_ab_LR_plat(mdl: Model, I: Instance):
 
 
 
-def add_taxi_like_constraints_ab_LR_plat(mdl, I, x, y, r, L, R, s, a, b, h):
+def add_taxi_like_constraints_ab_LR(mdl, I, x, y, r, L, R, s, a, b):
     """
     Add all constraints of the taxi-like MILP model to the docplex model.
     """
@@ -186,7 +178,7 @@ def add_taxi_like_constraints_ab_LR_plat(mdl, I, x, y, r, L, R, s, a, b, h):
     for m in M:
         for i in N:
             outgoing = [ (u,v) for (u,v) in A if u == i ]
-            incoming = [ (hh,v) for (hh,v) in A if v == i ]
+            incoming = [ (h,v) for (h,v) in A if v == i ]
 
             for t in T_pos:   # t > t0
                 lhs = x[m, i, t]
@@ -200,11 +192,11 @@ def add_taxi_like_constraints_ab_LR_plat(mdl, I, x, y, r, L, R, s, a, b, h):
 
                 # + sum_{h:(h,i)∈A, t - tau(h,i) >= t0} y[m,h,i,t - tau(h,i)]
                 incoming_terms = []
-                for (hh, i2) in incoming:
-                    travel = tau[(hh, i)]
+                for (h, i2) in incoming:
+                    travel = tau[(h, i)]
                     t_depart = t - travel
                     if t_depart >= t0:
-                        incoming_terms.append(y[m, hh, i, t_depart])
+                        incoming_terms.append(y[m, h, i, t_depart])
                 if incoming_terms:
                     rhs += mdl.sum(incoming_terms)
 
@@ -520,35 +512,24 @@ def add_taxi_like_constraints_ab_LR_plat(mdl, I, x, y, r, L, R, s, a, b, h):
                         ctname=f"b_prev_state_k{k}_t{t}_m{m}"
                     )
 
-    # ------------------------------------------------------------------
-    # 11) Definizione di h_{i,j,t}:
-    #     h[i,j,t] = sum_{m in M} y[m,i,j,t]
-    # ------------------------------------------------------------------
-    for (i, j) in A:
-        for t in T:
-            mdl.add_constraint(
-                h[i, j, t] == mdl.sum(y[m, i, j, t] for m in M),
-                ctname=f"h_def_i{i}_j{j}_t{t}"
-            )
-
-    # ------------------------------------------------------------------
-    # 11) Definizione di h_{i,j,t}:
-    #     h[i,j,t] = sum_{m in M} y[m,i,j,t]
-    # ------------------------------------------------------------------
-    for (i, j) in A:
-        for t in T:
-            mdl.add_constraint(
-                h[i, j, t] == mdl.sum(y[m, i, j, t] for m in M),
-                ctname=f"h_def_i{i}_j{j}_t{t}"
-            )
 
 
-
-
-def add_taxi_like_objective_ab_LR_plat(mdl, I, y, s, h):
+def add_taxi_like_objective_ab_LR(mdl, I, y, s):
     """
     Add the full taxi-like MILP objective function:
-        min ( C_oper + C_uns - G_plat)
+        min ( C_oper + C_uns )
+
+    Parameters
+    ----------
+    mdl : docplex.mp.model.Model
+    I   : Instance
+        Data container with sets and parameters.
+
+    y : docplex binary var dict
+        y[m,i,j,t] = 1 if module m departs from i to j at time t
+
+    s : docplex binary var dict
+        s[k] = 1 if request k is served
     """
 
     # -------------------------
@@ -571,28 +552,13 @@ def add_taxi_like_objective_ab_LR_plat(mdl, I, y, s, h):
         for k in I.K
     )
 
-
-    # -------------------------
-    # 3) Platooning "reward"
-    #     C_plat = - g_plat * sum_{i,j,t} gamma(i,j) * h[i,j,t]
-    # -------------------------
-    # Small check:
-    if I.g_plat > 1.0 / max(1, len(I.M)):
-        print(f"[WARN] g_plat={I.g_plat} > 1/|M|={1.0/len(I.M):.4f}")
-
-    C_plat = - I.g_plat * mdl.sum(
-        I.gamma[(i, j)] * h[i, j, t]
-        for (i, j) in I.A
-        for t in I.T
-    )
-
     # -------------------------
     # Minimize total cost
     # -------------------------
-    mdl.minimize(C_oper + C_uns - C_plat)
+    mdl.minimize(C_oper + C_uns)
 
     # Return objective expression if needed
-    return C_oper + C_uns - C_plat
+    return C_oper + C_uns
 
 
 
@@ -600,8 +566,7 @@ def add_taxi_like_objective_ab_LR_plat(mdl, I, y, s, h):
 
 
 
-
-def create_taxi_like_model_ab_LR_plat(I: Instance):
+def create_taxi_like_model_ab_LR(I: Instance):
     """
     Create:
         - Model()
@@ -613,15 +578,15 @@ def create_taxi_like_model_ab_LR_plat(I: Instance):
     mdl = Model(name="TaxiLike")
 
     # 1) variables
-    x, y, r, L, R, s, a, b, h = create_decision_variables_ab_LR_plat(mdl, I)
+    x, y, r, L, R, s, a, b = create_decision_variables_ab_LR(mdl, I)
 
     # 2) constraints
-    add_taxi_like_constraints_ab_LR_plat(mdl, I, x, y, r, L, R, s, a, b, h)
+    add_taxi_like_constraints_ab_LR(mdl, I, x, y, r, L, R, s, a, b)
 
     # 3) objective
-    add_taxi_like_objective_ab_LR_plat(mdl, I, y, s, h)
+    add_taxi_like_objective_ab_LR(mdl, I, y, s)
 
-    return mdl, x, y, r, L, R, s, a, b, h
+    return mdl, x, y, r, L, R, s, a, b
 
 
 

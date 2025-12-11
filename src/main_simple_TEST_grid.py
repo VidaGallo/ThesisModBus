@@ -35,8 +35,8 @@ if __name__ == "__main__":
     slack_min = 20.0
 
     # Parametri SPECIFICI
-    number        = 4      # lato griglia
-    num_modules   = 4
+    number        = 2      # lato griglia
+    num_modules   = 2
     num_requests  = 10
     
 

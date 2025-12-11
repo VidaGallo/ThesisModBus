@@ -7,7 +7,7 @@ from data_generation.generate_data import *
 
 import time
 
-from models.deterministic.model_MT_ab import *
+from models.deterministic.model_MT_w import *
 
 
 # seed
@@ -198,8 +198,8 @@ def run_single_model(
     #elif model_name == "ab_LR_plat":
     #    # idem con L,R
     #    model, x, y, r, L, R, s, a, b, D, U, z, kappa, h = create_taxi_like_model_ab_LR_plat(instance)
-    #else:
-    #    raise ValueError(f"Unknown model_name: {model_name}")
+    else:
+        raise ValueError(f"Unknown model_name: {model_name}")
 
     configure_cplex(model)
 
