@@ -14,3 +14,4 @@ pandas
 os
 itertools
 geopandas
+sklearn
