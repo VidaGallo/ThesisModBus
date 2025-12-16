@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
     # Parametri SPECIFICI
     num_modules   = 3
-    num_requests  = 20
+    num_requests  = 15
     
 
     # I modelli da confrontare

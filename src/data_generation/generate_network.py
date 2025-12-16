@@ -8,7 +8,7 @@ Supports two modes:
 1. GRID network:
    - Builds a side × side grid
 
-2. CITY network (optional):
+2. CITY network:
    - Loaded from OSM and normalized to the same JSON structure
 
 Output JSON contains:
@@ -17,12 +17,15 @@ Output JSON contains:
     - metadata (e.g., type, grid size)
 """
 
+from __future__ import annotations
+
 import json
 from pathlib import Path
 import matplotlib.pyplot as plt
 import random
 import osmnx as ox
 import networkx as nx
+import geopandas as gpd
 import os
 
 
@@ -56,7 +59,6 @@ def save_network_json(network_dict: dict, output_dir: str, filename: str = "netw
 #################
 # GRID GENERATOR:
 #################
-
 
 def generate_grid_network(
     side: int,
@@ -228,9 +230,9 @@ def generate_grid_network_asym(
 
 
 
-####################
-# NETWORK GENERATOR:
-####################
+############################
+# NETWORK GENERATOR - TURIN:
+############################
 def plot_city_suburb_network(
     osm_graph,
     network_dict: dict,
@@ -305,7 +307,7 @@ def generate_city_network_raw(
     k_lateral: int = 2,      
     k_center: int = 4,
     central_suburbs: list = None,
-    output_dir: str = "/home/vida/Desktop/TESI/thesis_code/instances/CITY/TORINO_SUB",
+    output_dir: str = "instances/CITY/TORINO_SUB",
     filename: str = "torino_suburbs_raw.png",
 ) -> tuple[dict, nx.MultiDiGraph]:
     """
@@ -875,9 +877,6 @@ def make_network_directed(network_dict: dict) -> dict:
     return new_network
 
 
-
-
-
 def generate_grid_network_city(
     place: str = "Torino, Italia",
     central_suburbs: list[str] = ["Centro", "Crocetta", "Santa Rita", "Aurora"],
@@ -980,7 +979,7 @@ def generate_grid_network_city(
 if __name__ == "__main__":
     place = "Torino, Italia",
     name = "Torino",
-    city_output_folder = "/home/vida/Desktop/TESI/thesis_code/instances/CITY/TORINO_SUB",
+    city_output_folder = "instances/CITY/TORINO_SUB",
     central_suburbs = ["Centro", "Crocetta", "Santa Rita", "Aurora"],
 
     # 1) RAW network
@@ -1069,3 +1068,342 @@ if __name__ == "__main__":
 
 
 
+
+
+
+
+
+#################################################
+# NETWORK GENERATOR - COEARSENING/SPARSIFICATION:
+#################################################
+
+
+"""
+PSEUDOCODE:
+- if there are suburb in labels => use suburb , otherwise use some coarsening algorithm
+- then use sparsification: keep k nearest neighbors for each node
+   + consider threshold => above treshold do not connect if there are already some neighborhoods even if less thank k,
+                        => below threshold connect also more then k if the supernode is central
+- to define CENTRAL we use centrality (prima betweenness centrality + poi closeness centrality, non basta la degree centrality)
+"""
+
+
+
+def get_osm_zones_or_none(place: str):
+    """
+    Try multiple OSM tag strategies to extract city subdivisions (zones).
+    Returns a GeoDataFrame dissolved by name (index=name) or None if nothing useful found.
+    """
+    tag_candidates = [
+        {"place": ["suburb", "neighbourhood", "quarter", "borough"]},
+        {"boundary": ["administrative"]},  # spesso richiede filtro extra (admin_level)
+    ]
+
+    # gdf = GeoDataFrame (ogni riga = un oggetto OSM (poligono, multipoligono, ecc.))
+    for tags in tag_candidates:
+        try:
+            gdf = ox.features_from_place(place, tags=tags)     # funzione che controlla le features del grafo senza doverlo scaricare
+        except Exception as e:
+            print(f"[OSM] errore query tags={tags}: {e}")
+            continue
+
+        if gdf is None or len(gdf) == 0:
+            continue
+
+        # Teniamo solo oggetti con name e geometry validi
+        keep_cols = [c for c in ["name", "geometry", "admin_level"] if c in gdf.columns]
+        gdf_sub = gdf[keep_cols].dropna(subset=["geometry"])
+
+        # Se "name" manca o è vuoto, non è utile come “zona”
+        if "name" not in gdf_sub.columns:
+            continue
+        gdf_sub = gdf_sub.dropna(subset=["name"])
+        gdf_sub = gdf_sub[gdf_sub["name"].astype(str).str.strip() != ""]
+
+        # Se è boundary=administrative, spesso conviene filtrare admin_level (es: 8/9/10)
+        # Osm ha confini a più livelli (2-nazione, 4-regione, 6-provincia, 8-comune, 10-frazione, ecc.)
+        if "boundary" in tags:
+            if "admin_level" in gdf_sub.columns:
+                gdf_sub = gdf_sub[gdf_sub["admin_level"].astype(str).isin(["8", "9", "10"])]
+
+        if len(gdf_sub) == 0:
+            continue
+
+        # Dissolve per ottenere 1 geometria per nome-zona
+        # Si possono avere MuliPoligon (ovvero zone spezzate) => gli fondiamo insieme by "name"
+        gdf_grouped = gdf_sub[["name", "geometry"]].dissolve(by="name")
+        # Rimuovi geometrie vuote/non valide
+        gdf_grouped = gdf_grouped[~gdf_grouped.geometry.is_empty & gdf_grouped.geometry.notna()]
+
+        if len(gdf_grouped) > 0:
+            found_type = list(tags.items())[0]
+            print(f"[OSM] trovate zone via tags={tags} -> #zone={len(gdf_grouped)}")
+            return gdf_grouped
+
+    # Se siamo arrivati fino a qui...
+    print("[OSM] nessuna suddivisione (suburb/neighbourhood/quarter/...) trovata.")
+    return None
+
+
+
+
+"""
+IN PROGRESS...
+
+def build_supernodes(G: nx.MultiDiGraph, place: str, n_coarsened: int, gdf_nodes: gpd.GeoDataFrame | None = None): 
+
+    Build super-nodes for a city:
+    - from scratch
+    - starting from existing zones
+
+    
+
+    # Caso: zone trovate
+    num_zones = len(gdf_zones)
+    print(f"[CHECK] zone OSM trovate: {num_zones} (target={n_coarsened})")
+
+    if num_zones > n_coarsened:
+        print(f"[COARSEN] troppe zone OSM ({num_zones}) -> riduco con algoritmo fino a {n_coarsened}")
+        # puoi passare le zone come input al tuo algoritmo, se lo supporta
+        # altrimenti fai coarsening “da rete” e basta
+        return coarsen_algo_fn(place=place, target_n=n_coarsened, zones_gdf=gdf_zones, **coarsen_kwargs)
+
+    print("[OK] zone OSM già <= target: le uso direttamente")
+    return gdf_zones
+
+
+
+
+
+def generate_city_network_coarsened(
+    place: str,
+    n_super_nodes: int = 20,
+    speed_kmh: float = 40.0,
+    plot: bool = True,
+    dir: str = "instances/CITY/",
+    filename: str = "network_coarsened.png",
+) -> tuple[dict, nx.MultiDiGraph]:
+    
+    output_dir = "instances/CITY/" / place.replace(",","").replace(" ","_")
+
+    # -------------------
+    # Download city graph 
+    # -------------------
+    osm_graph = ox.graph_from_place(
+        place,
+        network_type="drive",
+        simplify=True,
+    )
+
+    # ----------------
+    # Coarsening step:
+    # ----------------
+    # Check if there are "suburb" labels in OSM data
+    gdf = get_osm_zones_or_none(place)
+
+    # Se non si hanno già zone o si hanno troppi pochi nodi
+    if gdf is None or len(gdf) < n_super_nodes:   #NOTA: len(gdf) non funzionerebbe se gdf è None, ma cmq viene valutata priam l'istanza a sx    
+        gdf = build_supernodes(osm_graph, place, n_super_nodes, gdf)
+
+    # ------------------------
+    # 3) Centroids -> nearest OSM node
+    # ------------------------
+    suburb_nodes = {}   # name -> osm node id
+    node_entries = []   # list of dicts for "nodes" in JSON
+
+    for name, row in gdf_grouped.iterrows():
+        centroid = row["geometry"].centroid
+        lat, lon = centroid.y, centroid.x
+
+        osm_node = ox.distance.nearest_nodes(osm_graph, X=lon, Y=lat)
+
+        suburb_nodes[name] = osm_node
+        node_entries.append({
+            "id": int(osm_node),
+            "name": str(name),
+            "lat": float(lat),
+            "lon": float(lon),
+        })
+
+    # ------------------------------------------------------------
+    # Edge construction: central = k_center, lateral = k_lateral
+    # ------------------------------------------------------------
+    suburb_names = sorted(suburb_nodes.keys())
+
+    # Mapping: suburb name -> (lat, lon)
+    coords = {entry["name"]: (entry["lat"], entry["lon"]) for entry in node_entries}
+
+    def geo_dist2(a, b):
+
+        Squared geographic distance between two centroids (lat, lon).
+        We use squared distance because it preserves ordering and avoids sqrt().
+
+        (lat1, lon1), (lat2, lon2) = a, b
+        return (lat1 - lat2) ** 2 + (lon1 - lon2) ** 2
+
+    # Undirected adjacency list: suburb_name -> set(neighbor_names)
+    adjacency = {name: set() for name in suburb_names}
+
+    # ------------------------------------------------------------
+    # (1) INITIAL STEP: each suburb picks its nearest neighbors
+    #     - central suburbs use k_center
+    #     - lateral suburbs use k_lateral
+    # ------------------------------------------------------------
+    for name_u in suburb_names:
+        cu = coords[name_u]
+
+        # Build candidate list: all *other* suburbs with their distance
+        cand = []
+        for name_v in suburb_names:
+            if name_v == name_u:
+                continue
+            cv = coords[name_v]
+            d2 = geo_dist2(cu, cv)
+            cand.append((name_v, d2))
+
+        # Sort candidates by proximity
+        cand.sort(key=lambda x: x[1])
+
+        # Decide how many neighbors to keep (central vs lateral)
+        if name_u in central_suburbs:
+            k = min(k_center, len(cand))
+        else:
+            k = min(k_lateral, len(cand))
+
+        # List of the selected nearest neighbor names
+        chosen = [name_v for (name_v, _) in cand[:k]]
+
+        # Update adjacency (undirected)
+        for name_v in chosen:
+            adjacency[name_u].add(name_v)
+            adjacency[name_v].add(name_u)
+
+    # ------------------------------------------------------------
+    # (2) ADJUSTMENT STEP:
+    #     Try to enforce:
+    #       - central suburbs: exactly k_center neighbors
+    #       - non-central suburbs: exactly k_lateral neighbors
+    # ------------------------------------------------------------
+    for name_u in suburb_names:
+        # target degree for this suburb
+        if name_u in central_suburbs:
+            target_deg = k_center
+        else:
+            target_deg = k_lateral
+
+        cu = coords[name_u]
+
+        # ----------------------------
+        # (2a) Se ha meno del target:
+        #      aggiungi vicini mancanti
+        # ----------------------------
+        neighbors = list(adjacency[name_u])
+        if len(neighbors) < target_deg:
+            # candidati = tutti gli altri suburb che non sono già vicini
+            cand = []
+            for name_v in suburb_names:
+                if name_v == name_u:
+                    continue
+                if name_v in adjacency[name_u]:
+                    continue
+                cv = coords[name_v]
+                d2 = geo_dist2(cu, cv)
+                cand.append((name_v, d2))
+
+            # ordina per distanza geometrica
+            cand.sort(key=lambda x: x[1])
+
+            # aggiungi i più vicini finché non raggiungi target_deg
+            for (name_v, _) in cand:
+                adjacency[name_u].add(name_v)
+                adjacency[name_v].add(name_u)  # grafo non orientato
+                neighbors.append(name_v)
+                if len(neighbors) >= target_deg:
+                    break
+
+        # ----------------------------
+        # (2b) Se ha più del target:
+        #      tieni solo i target_deg più vicini
+        # ----------------------------
+        neighbors = list(adjacency[name_u])  # aggiorna dopo eventuali aggiunte
+        if len(neighbors) > target_deg:
+            # ordina i vicini per distanza
+            neighbors.sort(key=lambda name_v: geo_dist2(cu, coords[name_v]))
+
+            keep = set(neighbors[:target_deg])
+            remove = set(neighbors[target_deg:])
+
+            for name_v in remove:
+                adjacency[name_u].discard(name_v)
+                adjacency[name_v].discard(name_u)
+
+
+
+    # ------------------------------------------------------------
+    # (3) Convert adjacency structure into final edge list
+    #     Each edge (u,v) is undirected → only one entry per pair.
+    #     Distances come from OSM shortest-path length.
+    # ------------------------------------------------------------
+    edges = []
+    seen_pairs = set()  # prevent duplicates of (u,v) and (v,u)
+
+    for name_u in suburb_names:
+        u_node = suburb_nodes[name_u]
+        for name_v in adjacency[name_u]:
+            v_node = suburb_nodes[name_v]
+
+            # Normalize undirected pair
+            pair_key = tuple(sorted((u_node, v_node)))
+            if pair_key in seen_pairs:
+                continue
+            seen_pairs.add(pair_key)
+
+            # Try shortest path u→v; if no path, try v→u
+            try:
+                length_m = nx.shortest_path_length(
+                    osm_graph, source=u_node, target=v_node, weight="length"
+                )
+            except nx.NetworkXNoPath:
+                try:
+                    length_m = nx.shortest_path_length(
+                        osm_graph, source=v_node, target=u_node, weight="length"
+                    )
+                except nx.NetworkXNoPath:
+                    continue  # no path exists in either direction → skip
+
+            length_km = float(length_m) / 1000.0
+            time_min = (length_km / default_speed_kmh) * 60.0
+
+            edges.append({
+                "u": int(u_node),
+                "v": int(v_node),  # undirected edge represented as (u,v)
+                "length_km": length_km,
+                "time_min": float(time_min),
+            })
+
+
+
+    network_dict = {
+        "type": "CITY_SUBURB_UNDIRECTED",
+        "place": place,
+        "default_speed_kmh": float(default_speed_kmh),
+        "nodes": node_entries,
+        "edges": edges,
+    }
+
+    # --------------
+    # Optional: plot
+    # --------------
+    if plot:
+        plot_city_suburb_network(
+            osm_graph=osm_graph,
+            network_dict=network_dict,
+            place=place,
+            output_dir=output_dir,
+            filename=filename,
+            title_suffix="(raw)",
+        )
+
+    return network_dict, osm_graph
+
+"""

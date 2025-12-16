@@ -13,7 +13,8 @@ np.random.seed(seed)
 def configure_cplex(
     mdl: Model,
     time_limit: float = 36_000,     # seconds
-    mip_gap: float = 0.01,          # relative MIP gap
+    mip_gap: float = 0.01,          # relative MIP gap, 0.01 = 1%
+    abs_mip_gap: float = 1e-6,      # absolute MIP gap, 1e-6
     threads: int = 0,               # max threads
     mip_display: int = 1,           # MIP log verbosity
     emphasis_mip: int = 2,          # 2 = optimality
@@ -29,6 +30,7 @@ def configure_cplex(
     time_limit : Time limit in seconds.
 
     mip_gap : Relative MIP gap tolerance.
+    abs_mip_gap : Absolute MIP gap tolerance.
 
     threads : Max number of threads 
                     0 = all
@@ -62,8 +64,10 @@ def configure_cplex(
     # Time limit
     mdl.parameters.timelimit = time_limit
 
-    # Relative MIP gap
+    # Relative and absolute MIP gap
     mdl.parameters.mip.tolerances.mipgap = mip_gap
+    mdl.parameters.mip.tolerances.absmipgap = abs_mip_gap
+
 
     # Threads
     mdl.parameters.threads = threads
