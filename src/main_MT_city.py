@@ -5,7 +5,15 @@ from pathlib import Path
 from collections import Counter
 
 
-
+CPLEX_CFG = {
+    "time_limit": 36_000,     # seconds
+    "mip_gap": 0.01,          # relative MIP gap, 0.05 = 5%
+    "abs_mip_gap": 1e-6,      # absolute MIP gap
+    "threads": 0,             # 0 = all available threads
+    "mip_display": 1,         # 0..5 (2 = default)
+    "emphasis_mip": 2,        # 0 balanced, 1 feasibility, 2 optimality, ...
+    "parallel": 2             # 0 auto, 1 opportunistic, 2 deterministic
+}
 
 if __name__ == "__main__":
 
@@ -45,7 +53,7 @@ if __name__ == "__main__":
     num_requests  = 25
     
 
-    # I modelli da confrontare
+    # Nomi dei modelli da eseguire
     model_names = ["w"]
 
     all_results = []
@@ -132,6 +140,7 @@ if __name__ == "__main__":
             exp_id=exp_id,
             base_output_folder=base_folder,
             mean_speed_kmh=mean_speed_kmh,
+            cplex_cfg=CPLEX_CFG
         )
         all_results.append(res)
 

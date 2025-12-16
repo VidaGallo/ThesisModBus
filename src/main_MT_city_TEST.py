@@ -7,6 +7,18 @@ from itertools import product  # per fare il prodotto cartesiano delle combinazi
 
 
 
+CPLEX_CFG = {
+    "time_limit": 36_000,     # seconds
+    "mip_gap": 0.01,          # relative MIP gap, 0.05 = 5%
+    "abs_mip_gap": 1e-6,      # absolute MIP gap
+    "threads": 0,             # 0 = all available threads
+    "mip_display": 1,         # 0..5 (2 = default)
+    "emphasis_mip": 2,        # 0 balanced, 1 feasibility, 2 optimality, ...
+    "parallel": 2             # 0 auto, 1 opportunistic, 2 deterministic
+}
+
+
+
 if __name__ == "__main__":
 
     ### City
@@ -27,8 +39,8 @@ if __name__ == "__main__":
     q_min = 1
     q_max = 10
     slack_min = 30.0
-
-    # Modelli da confrontare
+    
+    # Nomi dei modelli da eseguire
     model_names = ["w"]
 
     # =====================================================
@@ -176,6 +188,7 @@ if __name__ == "__main__":
                 exp_id=exp_id,
                 mean_speed_kmh=mean_speed_kmh,
                 base_output_folder=base_folder,
+                cplex_cfg=CPLEX_CFG
             )
 
             # ATTACCO AI RISULTATI LE INFO DEI PARAMETRI DI QUESTO ROUND

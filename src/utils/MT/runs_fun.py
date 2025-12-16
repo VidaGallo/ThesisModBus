@@ -12,6 +12,9 @@ import random
 import numpy as np
 import pandas as pd
 
+from pathlib import Path
+from collections import Counter
+
 
 
 # ======================================================================
@@ -178,6 +181,7 @@ def run_single_model(
     mean_speed_kmh: float,
     rel_std: float,
     base_output_folder,    
+    cplex_cfg: dict | None = None
 ) -> dict:
     """
     Costruisce e risolve UNO dei modelli su una stessa Instance (GRID).
@@ -201,7 +205,7 @@ def run_single_model(
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
 
-    configure_cplex(model)
+    configure_cplex(model, cplex_cfg)   # CPLEX configuration
 
     # ----------------
     # Solve
@@ -373,6 +377,7 @@ def run_single_model_city(
     exp_id: int,
     mean_speed_kmh: float,
     base_output_folder,
+    cplex_cfg: dict | None = None
 ) -> dict:
     """
     Costruisce e risolve UNO dei modelli su una stessa Instance (CITY).
@@ -396,7 +401,7 @@ def run_single_model_city(
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
 
-    configure_cplex(model)
+    configure_cplex(model, cplex_cfg) 
 
     # ----------------
     # Solve
