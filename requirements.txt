@@ -12,4 +12,5 @@ matplotlib
 time
 pandas
 os
+itertools
 geopandas
