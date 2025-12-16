@@ -49,6 +49,7 @@ if __name__ == "__main__":
     num_Nw_list       = [3, 4]            # n° nodi scambio
     num_requests_list = [15, 25]          # numero richieste
     seed_list         = [23]              # seed
+    z_max         = 3      # max trail per main
 
     # =====================================================
     #  PREPARAZIONE CARTELLE OUTPUT
@@ -90,7 +91,7 @@ if __name__ == "__main__":
         np.random.seed(seed)
 
         exp_id = (
-            f"{city}_H{horizon}_dt{dt}_M{num_modules}_P{num_trails}_"
+            f"{city}_H{horizon}_dt{dt}_M{num_modules}_P{num_trails}_Z{z_max}_"
             f"K{num_requests}_Nw{num_Nw}_seed{seed}"
         )
 
@@ -128,6 +129,7 @@ if __name__ == "__main__":
             depot=depot,
             seed=seed,
             num_Nw=num_Nw,
+            z_max=z_max
         )
 
         # --- Controllo: conteggio capacità delle richieste (q_k) ---
@@ -169,6 +171,7 @@ if __name__ == "__main__":
                 horizon=horizon,
                 num_modules=num_modules,
                 num_trails=num_trails,
+                z_max=z_max,
                 Q=Q,
                 c_km=c_km,
                 c_uns=c_uns,
@@ -189,6 +192,7 @@ if __name__ == "__main__":
             res["dt"] = dt
             res["num_modules"] = num_modules
             res["num_trails"] = num_trails
+            res["z_max"] = z_max
             res["num_Nw"] = num_Nw
             res["num_requests"] = num_requests
             res["seed"] = seed

@@ -36,9 +36,10 @@ if __name__ == "__main__":
     slack_min = 20.0
 
     # Parametri SPECIFICI
-    number        = 4      # lato griglia
-    num_modules   = 3
+    number        = 2      # lato griglia
+    num_modules   = 2
     num_trails    = 6
+    z_max         = 3      # max trail per main
     num_requests  = 30
     
 
@@ -75,7 +76,8 @@ if __name__ == "__main__":
         slack_min=slack_min,
         depot=depot,
         seed=seed,
-        num_Nw=num_Nw
+        num_Nw=num_Nw,
+        z_max=z_max
     )
 
     
@@ -114,10 +116,11 @@ if __name__ == "__main__":
             number=number,
             horizon=horizon,
             num_modules=num_modules,
-            num_trails=num_trails,   # <<< aggiunto
+            num_trails=num_trails,   
+            z_max=z_max,
             Q=Q,
             c_km=c_km,
-            c_uns=c_uns,           # <<< nuovo nome
+            c_uns=c_uns,          
             g_plat=g_plat,
             num_requests=num_requests,
             q_min=q_min,
@@ -141,6 +144,8 @@ if __name__ == "__main__":
         f"{number}x{number}_"
         f"H{horizon}_"
         f"M{num_modules}_"
+        f"P{num_trails}_"
+        f"Z{z_max}_"
         f"K{num_requests}_"
         f"Nw{num_Nw}_models.csv"   
     )

@@ -133,7 +133,8 @@ def load_instance_discrete(
     c_uns: float,
     g_plat: float,
     depot: int,
-    num_Nw: int
+    num_Nw: int,
+    z_max: int | None = None
 ) -> Instance:
     """
     Build an Instance using already-discrete files.
@@ -146,6 +147,7 @@ def load_instance_discrete(
     t_max : int          # number of time slots
     num_modules : int    # number of MAIN modules |M|
     num_trail : int      # number of TRAIL modules |P|
+    z_max: int | None    # max number of trail modules per main module (if None, computed as |P|/|M|)
     Q : int              # module capacity
     c_km : float         # cost per km
     c_uns : float        # unserved demand penalty
@@ -171,12 +173,6 @@ def load_instance_discrete(
         d_in, d_out
     ) = load_discrete_requests(requests_path, t_max)
 
-    # (opzional) check for integer Z_max
-    if num_modules > 0 and (num_trail % num_modules != 0):
-        raise ValueError(
-            f"num_trail={num_trail} non è multiplo di num_modules={num_modules}: "
-            "Z_max = |P|/|M| non sarebbe intero."
-        )
 
     ### Build Class Instance
     return Instance(
@@ -203,5 +199,6 @@ def load_instance_discrete(
         depot=depot,
         dt=dt,
         t_max=t_max,
-        num_Nw=num_Nw
+        num_Nw=num_Nw,
+        z_max=z_max
     )

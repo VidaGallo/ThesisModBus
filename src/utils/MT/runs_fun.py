@@ -37,7 +37,8 @@ def build_instance_and_paths(
     slack_min: float,
     depot: int,
     seed: int,
-    num_Nw: int
+    num_Nw: int,
+    z_max: int | None = None
 ):
     """
     Generate the asymmetric GRID network and the requests, then build Instance.
@@ -71,7 +72,8 @@ def build_instance_and_paths(
         c_uns=c_uns,
         g_plat=g_plat,
         depot=depot,
-        num_Nw=num_Nw          # first N by degree
+        num_Nw=num_Nw,          # first N by degree
+        z_max=z_max
     )
 
     return instance, network_path, requests_path, t_max
@@ -98,7 +100,8 @@ def build_instance_and_paths_city(
     slack_min: float,
     depot: int,
     seed: int,
-    num_Nw: int
+    num_Nw: int,
+    z_max: int | None = None
 ):
     """
     Generate the CITY network and the requests, then build Instance.
@@ -134,7 +137,8 @@ def build_instance_and_paths_city(
         c_uns=c_uns,
         g_plat=g_plat,
         depot=depot,
-        num_Nw=num_Nw          # first N by degree
+        num_Nw=num_Nw,          # first N by degree
+        z_max=z_max
     )
 
     return instance, network_path, requests_path, t_max
@@ -154,6 +158,7 @@ def run_single_model(
     horizon: int,
     num_modules: int,
     num_trails: int,
+    z_max: int | None,
     Q: int,
     c_km: float,
     c_uns: float,
@@ -166,6 +171,7 @@ def run_single_model(
     seed: int,
     exp_id: int,
     base_output_folder,
+    
 ) -> dict:
     """
     Costruisce e risolve UNO dei modelli su una stessa Instance (GRID).
@@ -307,6 +313,7 @@ def run_single_model(
         "t_max": t_max,
         "num_modules": num_modules,
         "num_trails": num_trails,
+        "z_max": z_max,
         "Q": Q,
         "c_km": c_km,
         "c_uns": c_uns,
@@ -357,6 +364,7 @@ def run_single_model_city(
     horizon: int,
     num_modules: int,
     num_trails: int,
+    z_max: int | None,
     Q: int,
     c_km: float,
     c_uns: float,
@@ -499,6 +507,7 @@ def run_single_model_city(
         "t_max": t_max,
         "num_modules": num_modules,
         "num_trails": num_trails,
+        "z_max": z_max,
         "Q": Q,
         "c_km": c_km,
         "c_uns": c_uns,

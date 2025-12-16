@@ -45,6 +45,7 @@ class Instance:
 
     ### --- global parameters ---
     Q: int                    # module capacity
+    z_max: int                # max number of trail modules per main module (if None, computed as |P|/|M|)
     c_km: float               # cost per km
     c_uns: float              # penalty cost for unserved demand
     g_plat: float             # reward for having a platoon (to subtract to the c_op)
@@ -124,19 +125,36 @@ class Instance:
     @property
     def Z_max(self) -> int:
         """
-        Z_max = |P| / |M|, con |P| multiplo di |M| come da definizione nel modello.
+        Numero massimo di TRAIL agganciabili a un MAIN.
         """
+        # ---- caso utente ----
+        if self.z_max is not None:
+            z = int(self.z_max)
+            if z < 0:
+                raise ValueError("z_max deve essere >= 0")
+            if self.num_modules == 0:
+                if z == 0 and self.num_trail_modules == 0:
+                    return 0
+                raise ValueError(
+                    "z_max > 0 o TRAIL presenti senza MAIN disponibili"
+                )
+            if z > self.num_trail_modules:
+                raise ValueError(
+                    f"z_max={z} > |P|={self.num_trail_modules}"
+                )
+            return z
+
+        # ---- fallback automatico ----
         if self.num_modules == 0:
-            return 0
-        """
-        # opzionale: controllo di consistenza
+            if self.num_trail_modules == 0:
+                return 0
+            raise ValueError("TRAIL presenti ma nessun MAIN disponibile")
+
         if self.num_trail_modules % self.num_modules != 0:
             raise ValueError(
-                f"|P|={self.num_trail_modules} non è multiplo di |M|={self.num_modules}, "
-                "non posso calcolare Z_max intero."
+                f"|P|={self.num_trail_modules} non multiplo di |M|={self.num_modules}"
             )
+
         return self.num_trail_modules // self.num_modules
-        """
-        return 3     # fixed (for now)
     
 

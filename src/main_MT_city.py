@@ -45,6 +45,7 @@ if __name__ == "__main__":
     # Parametri SPECIFICI
     num_modules   = 3
     num_trails    = 6
+    z_max         = 3      # max trail per main
     num_requests  = 25
     
 
@@ -81,7 +82,8 @@ if __name__ == "__main__":
         slack_min=slack_min,
         depot=depot,
         seed=seed,
-        num_Nw=num_Nw
+        num_Nw=num_Nw,
+        z_max=z_max
     )
 
     
@@ -121,6 +123,7 @@ if __name__ == "__main__":
             horizon=horizon,
             num_modules=num_modules,
             num_trails=num_trails,
+            z_max=z_max,
             Q=Q,
             c_km=c_km,
             c_uns=c_uns,
@@ -147,6 +150,8 @@ if __name__ == "__main__":
         f"{city}_"
         f"H{horizon}_"
         f"M{num_modules}_"
+        f"P{num_trails}_"
+        f"Z{z_max}_"
         f"K{num_requests}_"
         f"Nw{num_Nw}.csv"
     )
