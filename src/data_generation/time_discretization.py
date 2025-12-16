@@ -37,14 +37,6 @@ import math
 from pathlib import Path
 
 
-# seed
-import random
-import numpy as np
-seed = 23
-random.seed(seed)
-np.random.seed(seed)
-
-
 
 def interval_to_indices(start_min: float, end_min: float, time_step_min: float):
     """

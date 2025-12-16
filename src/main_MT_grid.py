@@ -5,17 +5,11 @@ from pathlib import Path
 from collections import Counter
 
 
-# seed
-import random
-import numpy as np
-seed = 23
-random.seed(seed)
-np.random.seed(seed)
-
-
-
 
 if __name__ == "__main__":
+    
+    ### Seed
+    seed = 23
 
     # ----------------
     # Base params 
@@ -25,6 +19,9 @@ if __name__ == "__main__":
     depot = 0
 
     Q = 10
+    mean_speed_kmh = 40.0
+    mean_edge_length_km = 3.33
+    rel_std = 0.66
     c_km = 1.0
     c_uns = 100
     g_plat = None
@@ -77,6 +74,9 @@ if __name__ == "__main__":
         depot=depot,
         seed=seed,
         num_Nw=num_Nw,
+       mean_edge_length_km=mean_edge_length_km,
+        mean_speed_kmh=mean_speed_kmh,
+        rel_std=rel_std,
         z_max=z_max
     )
 

@@ -1,28 +1,19 @@
 """
+INSTANCE
+=========
+
 Instance definition for the modular bus / taxi-like MILP.
 
-This module defines the `Instance` dataclass, which aggregates all sets,
-parameters and sparse data structures needed by the optimization model:
-- network sets (nodes, arcs) and travel times,
-- fleet data (modules, capacity, costs),
-- request data (origins, destinations, time windows, demand),
-- sparse boarding/alighting indicators d_in, d_out,
-- basic discretization info (time step, time horizon).
-
-The `Instance` object is the single container that is built by the loader
-(from JSON files) and then passed to model builders / solvers (e.g. CPLEX/OPL
-or docplex).
+The `Instance` dataclass aggregates all network, demand, fleet and
+discretization data required by the optimization model, providing a
+single structured input to the solver.
 """
+
+
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Set
 
-# seed
-import random
-import numpy as np
-seed = 23
-random.seed(seed)
-np.random.seed(seed)
 
 
 Node = int

@@ -1,6 +1,5 @@
 from utils.MT.loader_fun import *
 from utils.MT.instance_def import *
-from utils.MT.print_fun import *
 from utils.MT.cplex_config import *
 from utils.MT.output_fun import *
 from data_generation.generate_data import *
@@ -9,13 +8,9 @@ import time
 
 from models.deterministic.model_MT_w import *
 
-
-# seed
 import random
 import numpy as np
-seed = 23
-random.seed(seed)
-np.random.seed(seed)
+
 
 
 # ======================================================================
@@ -38,13 +33,14 @@ def build_instance_and_paths(
     depot: int,
     seed: int,
     num_Nw: int,
+    mean_edge_length_km: float,
+    mean_speed_kmh: float,
+    rel_std: float,
     z_max: int | None = None
 ):
     """
     Generate the asymmetric GRID network and the requests, then build Instance.
     """
-    random.seed(seed)
-    np.random.seed(seed)
 
     t_max = horizon // dt
 
@@ -57,8 +53,13 @@ def build_instance_and_paths(
         q_min=q_min,
         q_max=q_max,
         slack_min=slack_min,
-        depot=depot
+        depot=depot,
+        mean_edge_length_km=mean_edge_length_km,
+        mean_speed_kmh=mean_speed_kmh,
+        rel_std=rel_std,
+        seed=seed
     )
+
 
     instance = load_instance_discrete(
         network_path=network_path,
@@ -66,17 +67,20 @@ def build_instance_and_paths(
         dt=dt,
         t_max=t_max,
         num_modules=num_modules,
-        num_trail=num_trails,   # <-- |P|
+        num_trail=num_trails,
         Q=Q,
         c_km=c_km,
         c_uns=c_uns,
         g_plat=g_plat,
         depot=depot,
-        num_Nw=num_Nw,          # first N by degree
+        num_Nw=num_Nw,      # first N by degree
         z_max=z_max
     )
 
     return instance, network_path, requests_path, t_max
+
+
+
 
 
 # ======================================================================
@@ -101,13 +105,12 @@ def build_instance_and_paths_city(
     depot: int,
     seed: int,
     num_Nw: int,
+    mean_speed_kmh: float,
     z_max: int | None = None
 ):
     """
     Generate the CITY network and the requests, then build Instance.
     """
-    random.seed(seed)
-    np.random.seed(seed)
 
     t_max = horizon // dt
 
@@ -122,7 +125,9 @@ def build_instance_and_paths_city(
         q_min=q_min,
         q_max=q_max,
         slack_min=slack_min,
-        depot=depot
+        mean_speed_kmh=mean_speed_kmh,
+        depot=depot,
+        seed=seed
     )
 
     instance = load_instance_discrete(
@@ -142,6 +147,9 @@ def build_instance_and_paths_city(
     )
 
     return instance, network_path, requests_path, t_max
+
+
+
 
 
 # ======================================================================
@@ -170,8 +178,10 @@ def run_single_model(
     depot: int,
     seed: int,
     exp_id: int,
-    base_output_folder,
-    
+    mean_edge_length_km: float,
+    mean_speed_kmh: float,
+    rel_std: float,
+    base_output_folder,    
 ) -> dict:
     """
     Costruisce e risolve UNO dei modelli su una stessa Instance (GRID).
@@ -191,7 +201,7 @@ def run_single_model(
     D = U = z = kappa = None   # variabili TRAIL per i modelli con platoon
 
     if  model_name == "w":
-        model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_ab(instance)
+        model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_w(instance)
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
 
@@ -296,6 +306,9 @@ def run_single_model(
         "seed": seed,
         "number": number,
         "grid_nodes": number * number,
+        "mean_edge_length": mean_edge_length_km,
+        "mean_speed": mean_speed_kmh,
+        "std": rel_std,
         "horizon": horizon,
         "dt": dt,
         "t_max": t_max,
@@ -364,6 +377,7 @@ def run_single_model_city(
     depot: int,
     seed: int,
     exp_id: int,
+    mean_speed_kmh: float,
     base_output_folder,
 ) -> dict:
     """
@@ -383,9 +397,8 @@ def run_single_model_city(
     x = y = r = w = L = R = s = a = b = h = None
     D = U = z = kappa = None
 
-    if model_name == "ab":
-        # nuovo modello MT che restituisce anche D,U,z,kappa,h
-        model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_ab(instance)
+    if model_name == "w":
+        model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_w(instance)
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
 
@@ -491,6 +504,7 @@ def run_single_model_city(
         "seed": seed,
         "city": city,
         "horizon": horizon,
+        "mean_speed": mean_speed_kmh,
         "dt": dt,
         "t_max": t_max,
         "num_modules": num_modules,

@@ -11,22 +11,28 @@ if __name__ == "__main__":
     # CHOOSE MODE
     # -----------------------------
     MODE = "GRID"   # "GRID" or "CITY"
+  
+    ### Seed
+    seed = 23
 
     # -----------------------------
     # COMMON PARAMS
     # -----------------------------
-    seed = 23
     horizon = 120          # minutes
     dt = 3
     num_requests = 30
-    q_min, q_max = 1, 6
+    q_min, q_max = 1, 6 
     slack_min = 20.0
     depot = 0
 
     number = 3
     num_modules = 3
     num_trails  = 6
+
     Q = 10
+    mean_speed_kmh = 40.0
+    mean_edge_length_km = 3.33
+    rel_std = 0.66
     c_km = 1.0
     c_uns = 100.0
     g_plat = None

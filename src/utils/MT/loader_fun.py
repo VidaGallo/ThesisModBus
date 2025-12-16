@@ -19,13 +19,6 @@ from typing import Tuple, Dict, List, Set
 
 from .instance_def import *
 
-# seed
-import random
-import numpy as np
-seed = 23
-random.seed(seed)
-np.random.seed(seed)
-
 
 
 ##### Network with already discretized travel times 

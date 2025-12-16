@@ -1,12 +1,18 @@
+"""
+CPLEX Configuration Module
+==========================
+
+Configure CPLEX solver parameters for MILP experiments.
+
+This function sets time limits, optimality gaps, logging level,
+parallelism, and search emphasis in a centralized and reproducible way.
+"""
+
+
+
+
+
 from docplex.mp.model import Model
-
-
-# seed
-import random
-import numpy as np
-seed = 23
-random.seed(seed)
-np.random.seed(seed)
 
 
 

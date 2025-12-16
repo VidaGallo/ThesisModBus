@@ -131,7 +131,8 @@ def generate_grid_network_asym(
     side: int,
     edge_length_km: float = 1.0,
     speed_kmh: float = 40.0,
-    rel_std: float = 0.2
+    rel_std: float = 0.2,
+    rng=None
 ) -> dict:
     """
     Generate a side × side GRID network with asymmetric edge lengths.
@@ -139,6 +140,9 @@ def generate_grid_network_asym(
     Each directed edge (u -> v) gets a length drawn from a normal
     distribution with mean = edge_length_km and std = rel_std * edge_length_km.
     """
+    # reproducible RNG
+    rng = rng or random 
+
     # --- Nodes ---
     nodes = []
     for row in range(side):
@@ -169,7 +173,7 @@ def generate_grid_network_asym(
         # campiona finché non ottieni una lunghezza positiva
         length = -1.0
         while length <= 0:
-            length = random.gauss(mu, sigma)
+            length = rng.gauss(mu, sigma)
         return float(length)
 
     for row in range(side):

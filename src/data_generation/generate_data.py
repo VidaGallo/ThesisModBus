@@ -21,12 +21,20 @@ from .generate_network import *
 from .generate_demands import *
 from .time_discretization import *
 
+
 import random
 import numpy as np
 
-def set_seed(seed: int = 23):
+def set_seed(seed: int) -> random.Random:
+    if seed is None:
+        raise ValueError(
+            "seed=None is not allowed. "
+            "For reproducible experiments, seed must be an integer."
+        )
+
     random.seed(seed)
     np.random.seed(seed)
+    return random.Random(seed)
 
 
 
@@ -40,6 +48,7 @@ def generate_all_data(
     q_min: int,
     q_max: int,
     slack_min: float,
+    depot: int,
     seed: int = 23,
     mean_edge_length_km: float = 3.0,
     mean_speed_kmh: float = 40.0
@@ -51,17 +60,22 @@ def generate_all_data(
     Returns:
       network_disc_path, requests_disc_path
     """
-    set_seed(seed)
+    rng = set_seed(seed)
 
     ### BUILD FOLDER
-    base = f"instances/GRID/{number}x{number}"
-    Path(base).mkdir(parents=True, exist_ok=True)
+    base = (
+        Path("instances")
+        / "GRID"
+        / f"{number}x{number}"
+        / f"seed{seed}_K{num_requests}_sl{slack_min}_dt{dt}"
+        / f"len{mean_edge_length_km}_v{mean_speed_kmh}"
+    )
+    base.mkdir(parents=True, exist_ok=True)
 
-    network_cont = f"{base}/network.json"
-    requests_cont = f"{base}/requests_{horizon}maxmin.json"
-
-    network_disc = f"{base}/network_disc{dt}min.json"
-    requests_disc = f"{base}/requests_{horizon}maxmin_disc{dt}min.json"
+    network_cont  = base / "network.json"
+    requests_cont = base / "requests.json"
+    network_disc  = base / f"network_disc{dt}min.json"
+    requests_disc = base / f"requests_disc{dt}min.json"
 
 
     ### GENERATE CONTINUOUS NETWORK
@@ -82,7 +96,9 @@ def generate_all_data(
         q_min=q_min,
         q_max=q_max,
         slack_min=slack_min,
-        time_horizon_max=float(horizon)
+        time_horizon_max=float(horizon),
+        depot=depot,
+        rng=rng
     )
 
     save_requests(requests_cont, taxi_requests)
@@ -123,7 +139,8 @@ def generate_all_data_asym(
     depot: int,
     mean_edge_length_km: float = 3.33,
     mean_speed_kmh: float = 40.0,
-    length_std: float = 0.66
+    rel_std: float = 0.66,
+    seed: int = 23,
 ):
     """
     Generate continuous network + continuous requests,
@@ -132,17 +149,22 @@ def generate_all_data_asym(
     Returns:
       network_disc_path, requests_disc_path
     """
-    set_seed(seed)
+    rng = set_seed(seed)
 
     ### BUILD FOLDER
-    base = f"instances/GRID/{number}x{number}"
-    Path(base).mkdir(parents=True, exist_ok=True)
+    base = (
+        Path("instances")
+        / "GRID_ASYM"
+        / f"{number}x{number}"
+        / f"seed{seed}_K{num_requests}_sl{slack_min}_dt{dt}"
+        / f"len{mean_edge_length_km}_v{mean_speed_kmh}_std{rel_std}"
+    )
+    base.mkdir(parents=True, exist_ok=True)
 
-    network_cont = f"{base}/network.json"
-    requests_cont = f"{base}/requests_{horizon}maxmin.json"
-
-    network_disc = f"{base}/network_disc{dt}min.json"
-    requests_disc = f"{base}/requests_{horizon}maxmin_disc{dt}min.json"
+    network_cont  = base / "network.json"
+    requests_cont = base / "requests.json"
+    network_disc  = base / f"network_disc{dt}min.json"
+    requests_disc = base / f"requests_disc{dt}min.json"
 
 
     ### GENERATE CONTINUOUS NETWORK
@@ -150,7 +172,9 @@ def generate_all_data_asym(
         side=number,
         edge_length_km=mean_edge_length_km,
         speed_kmh=mean_speed_kmh,
-        rel_std = length_std
+        rel_std = rel_std,
+        rng = rng
+
     )
     save_network_json(network, base, filename="network.json")
 
@@ -165,7 +189,8 @@ def generate_all_data_asym(
         q_max=q_max,
         slack_min=slack_min,
         time_horizon_max=float(horizon),
-        depot=depot
+        depot=depot,
+        rng=rng
     )
 
     save_requests(requests_cont, taxi_requests)
@@ -221,16 +246,29 @@ def generate_all_data_city(
     Returns:
       network_disc_path, requests_disc_path
     """
+    rng = set_seed(seed)
 
     ### BUILD FOLDER
-    base = f"instances/CITY/{subdir}"
-    Path(base).mkdir(parents=True, exist_ok=True)
+    city_slug = (
+        city.lower()
+        .replace(",","")
+        .replace(" ", "_")
+    )
 
-    network_cont = f"{base}/network.json"
-    requests_cont = f"{base}/requests_{horizon}maxmin.json"
+    base = (
+        Path("instances")
+        / "CITY"
+        / subdir
+        / city_slug
+        / f"seed{seed}_K{num_requests}_sl{slack_min}_dt{dt}"
+        / f"v{mean_speed_kmh}"
+    )
+    base.mkdir(parents=True, exist_ok=True)
 
-    network_disc = f"{base}/network_disc{dt}min.json"
-    requests_disc = f"{base}/requests_{horizon}maxmin_disc{dt}min.json"
+    network_cont  = base / "network.json"
+    requests_cont = base / "requests.json"
+    network_disc  = base / f"network_disc{dt}min.json"
+    requests_disc = base / f"requests_disc{dt}min.json"
 
 
     ### GENERATE CONTINUOUS NETWORK
@@ -252,7 +290,8 @@ def generate_all_data_city(
         q_max=q_max,
         slack_min=slack_min,
         time_horizon_max=float(horizon),
-        depot=depot
+        depot=depot,
+        rng=rng
     )
 
     save_requests(requests_cont, taxi_requests)

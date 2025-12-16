@@ -6,11 +6,6 @@ from collections import Counter
 from itertools import product  # per fare il prodotto cartesiano delle combinazioni
 
 
-# seed base (lo useremo come riferimento, ma poi lo variamo)
-import random
-import numpy as np
-BASE_SEED = 23
-
 
 if __name__ == "__main__":
 
@@ -25,6 +20,7 @@ if __name__ == "__main__":
     depot = 1198867366   # Centro Torino
 
     Q = 10
+    mean_speed_kmh = 40.0
     c_km = 1.0
     c_uns = 100
     g_plat = None
@@ -86,9 +82,6 @@ if __name__ == "__main__":
         
         exp_counter += 1
 
-        # Fisso il seed per questo round (così Requests cambiano)
-        random.seed(seed)
-        np.random.seed(seed)
 
         exp_id = (
             f"{city}_H{horizon}_dt{dt}_M{num_modules}_P{num_trails}_Z{z_max}_"
@@ -129,6 +122,7 @@ if __name__ == "__main__":
             depot=depot,
             seed=seed,
             num_Nw=num_Nw,
+            mean_speed_kmh=mean_speed_kmh,
             z_max=z_max
         )
 

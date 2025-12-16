@@ -4,7 +4,7 @@ from utils.MT.instance_def import Instance
 
 
 
-def create_decision_variables_ab(mdl: Model, I: Instance):
+def create_decision_variables_w(mdl: Model, I: Instance):
     """
     Create all MILP decision variables for the taxi-like model.
     """
@@ -142,7 +142,7 @@ def create_decision_variables_ab(mdl: Model, I: Instance):
 
 
 
-def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
+def add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
     """
     Add all constraints of the taxi-like MILP model to the docplex model.
     """
@@ -702,7 +702,7 @@ def add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h)
 
 
 
-def add_taxi_like_objective_ab(mdl, I, h, s):
+def add_taxi_like_objective_w(mdl, I, h, s):
     """
     Add the full taxi-like MILP objective function:
         min ( C_oper + C_uns )
@@ -754,7 +754,7 @@ def add_taxi_like_objective_ab(mdl, I, h, s):
 
 
 
-def create_MT_model_ab(I: Instance):
+def create_MT_model_w(I: Instance):
     """
     Create:
         - Model()
@@ -766,13 +766,13 @@ def create_MT_model_ab(I: Instance):
     mdl = Model(name="TaxiLike")
 
     # 1) variables
-    x, y, r, w, s, a, b, D, U, z, kappa,h = create_decision_variables_ab(mdl, I)
+    x, y, r, w, s, a, b, D, U, z, kappa,h = create_decision_variables_w(mdl, I)
 
     # 2) constraints
-    add_taxi_like_constraints_ab(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa,h)
+    add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa,h)
 
     # 3) objective
-    add_taxi_like_objective_ab(mdl, I, h, s)
+    add_taxi_like_objective_w(mdl, I, h, s)
 
     return mdl, x, y, r, w, s, a, b, D, U, z, kappa,h
 

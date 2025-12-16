@@ -1,25 +1,17 @@
 """
 CPLEX Logging and Output Utilities
+==================================
 
-Provides functions to:
-- create structured output folders for experiments,
-- save CPLEX logs and LP model files,
-- store solution summaries (objective, status, gap, time),
-- save basic model statistics (variables, constraints).
-
-These utilities help keep optimization experiments organized and reproducible.
+Utilities to manage and store the outputs of CPLEX optimization runs.
+The module supports structured result folders, export of LP models and solver
+logs, and saving of solution summaries and decision variables for
+post-processing and reproducibility.
 """
 
 
 from pathlib import Path
 from docplex.mp.model import Model
 
-# seed
-import random
-import numpy as np
-seed = 23
-random.seed(seed)
-np.random.seed(seed)
 
 
 def build_output_folder(base_dir: str, network_path: str, t_max: int, dt: int):

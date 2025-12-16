@@ -54,10 +54,13 @@ def generate_requests(
     time_horizon_max: float = 600.0,   # 10h
     depot: int = 0,
     alpha: float = 0.65,
+    rng=None,   
 ) -> list:
     """
     Generate taxi-like requests with continuous time fields.
     """
+    # reproducible RNG
+    rng = rng or random 
 
     requests = []
     nodes = list(G.nodes())
@@ -71,10 +74,10 @@ def generate_requests(
 
 
             ##### Origin and Destionation: #####
-            origin = random.choice(nodes)
-            dest = random.choice(nodes)
+            origin = rng.choice(nodes)
+            dest = rng.choice(nodes)
             while dest == origin:
-                dest = random.choice(nodes)
+                dest = rng.choice(nodes)
 
 
 
@@ -83,7 +86,7 @@ def generate_requests(
             # (2) exponential demand, with q_k = 1 highest probability
 
             # --- (1) random ---
-            #demand = random.randint(q_min, q_max)
+            #demand = rng.randint(q_min, q_max)
             
             # --- (2) exponential ---
             q_values = list(range(q_min, q_max + 1))
@@ -95,7 +98,7 @@ def generate_requests(
             total = sum(q_weights)
             q_weights = [w / total for w in q_weights]
 
-            demand = random.choices(q_values, weights=q_weights, k=1)[0]
+            demand = rng.choices(q_values, weights=q_weights, k=1)[0]
 
 
 
@@ -123,7 +126,7 @@ def generate_requests(
                 continue
 
             # Start sampling from first feasable moment
-            desired_dep = random.uniform(tau_depot_origin, latest_departure)
+            desired_dep = rng.uniform(tau_depot_origin, latest_departure)
 
             desired_arr = desired_dep + tau_sp
 

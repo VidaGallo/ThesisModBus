@@ -5,14 +5,6 @@ from pathlib import Path
 from collections import Counter
 
 
-# seed
-import random
-import numpy as np
-seed = 23
-random.seed(seed)
-np.random.seed(seed)
-
-
 
 
 if __name__ == "__main__":
@@ -23,6 +15,10 @@ if __name__ == "__main__":
     central_suburbs =   ["Centro", "Crocetta", "Santa Rita", "Aurora"]
 
 
+    ### Seed
+    seed = 23
+
+
     # ----------------
     # Base params 
     # ----------------
@@ -31,6 +27,7 @@ if __name__ == "__main__":
     depot = 1198867366   # Centro Torino
 
     Q = 10
+    mean_speed_kmh = 40.0
     c_km = 1.0
     c_uns = 100
     g_plat = None
@@ -83,6 +80,7 @@ if __name__ == "__main__":
         depot=depot,
         seed=seed,
         num_Nw=num_Nw,
+        mean_speed_kmh=mean_speed_kmh,
         z_max=z_max
     )
 
