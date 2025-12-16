@@ -128,6 +128,7 @@ class Instance:
         """
         if self.num_modules == 0:
             return 0
+        """
         # opzionale: controllo di consistenza
         if self.num_trail_modules % self.num_modules != 0:
             raise ValueError(
@@ -135,5 +136,7 @@ class Instance:
                 "non posso calcolare Z_max intero."
             )
         return self.num_trail_modules // self.num_modules
+        """
+        return 3     # fixed (for now)
     
 

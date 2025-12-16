@@ -292,8 +292,9 @@ def plot_city_suburb_network(
     plt.tight_layout()
 
     # Save to specific folder
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, filename)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / filename
     plt.savefig(output_path, dpi=500)
     print(f"Saved plot as {output_path}")
 
@@ -567,7 +568,7 @@ def generate_city_network_merged(
     merge_groups: list[tuple[str, ...]],
     place: str,
     plot: bool = True,
-    output_dir: str = "/home/vida/Desktop/TESI/thesis_code/instances/CITY/TORINO_SUB",
+    output_dir: str = "instances/CITY/TORINO_SUB",
     filename: str = "torino_suburbs_merged.png",
 ) -> dict:
     """
@@ -695,7 +696,7 @@ def generate_city_network_reworked(
     add_edges: list[tuple[object, object]] | None = None,
     default_speed_kmh: float | None = None,
     plot: bool = True,
-    output_dir: str = "/home/vida/Desktop/TESI/thesis_code/instances/CITY/TORINO_SUB",
+    output_dir: str = "instances/CITY/TORINO_SUB",
     filename: str = "torino_suburbs_final.png",
 ) -> dict:
     """
@@ -974,7 +975,7 @@ def generate_grid_network_city(
 
 
 
-
+"""
 ### TEST MAIN ###
 if __name__ == "__main__":
     place = "Torino, Italia",
