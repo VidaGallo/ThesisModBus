@@ -134,6 +134,7 @@ if __name__ == "__main__":
             seed=seed,
             exp_id=exp_id,
             base_output_folder=base_folder,
+            mean_speed_kmh=mean_speed_kmh,
         )
         all_results.append(res)
 

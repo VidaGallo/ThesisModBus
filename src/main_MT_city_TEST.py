@@ -177,6 +177,7 @@ if __name__ == "__main__":
                 depot=depot,
                 seed=seed,
                 exp_id=exp_id,
+                mean_speed_kmh=mean_speed_kmh,
                 base_output_folder=base_folder,
             )
 

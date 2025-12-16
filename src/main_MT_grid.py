@@ -26,7 +26,7 @@ if __name__ == "__main__":
     c_uns = 100
     g_plat = None
 
-    num_Nw = 3    # n°nodi che permettono lo scambio
+    num_Nw = 2    # n°nodi che permettono lo scambio
 
     q_min = 1
     q_max = 10
@@ -74,7 +74,7 @@ if __name__ == "__main__":
         depot=depot,
         seed=seed,
         num_Nw=num_Nw,
-       mean_edge_length_km=mean_edge_length_km,
+        mean_edge_length_km=mean_edge_length_km,
         mean_speed_kmh=mean_speed_kmh,
         rel_std=rel_std,
         z_max=z_max
@@ -129,6 +129,9 @@ if __name__ == "__main__":
             depot=depot,
             seed=seed,
             exp_id=exp_id,
+            mean_edge_length_km=mean_edge_length_km,
+            mean_speed_kmh=mean_speed_kmh,
+            rel_std=rel_std,
             base_output_folder=base_folder,
         )
         all_results.append(res)
