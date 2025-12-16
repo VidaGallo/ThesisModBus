@@ -2,25 +2,21 @@
 Demand Generator
 ================
 
-Generates travel requests in continuous time for use in the optimization
-experiments. The generator works with any network produced by
-`generate_network.py` (GRID or CITY).
+This module generates travel requests in continuous time
+for the optimization experiments.
 
-The output requests are *not discretized*.
+It works with any network produced by `generate_network.py`
+(e.g., GRID or CITY networks).
 
-Each request includes:
-    - origin and destination node
-    - demand q_k (passengers)
-    - desired departure / arrival time (continuous, minutes)
-    - slack window ȳΔ_k (flexibility, e.g. 30 min)
-    - shortest-path travel time τ_sp (minutes)
-    - continuous service window ΔT_k_min = [t_start, t_end]
-    - continuous boarding window ΔT_k_in_min
-    - continuous alighting window ΔT_k_out_min
+Each generated request includes:
+- origin and destination nodes,
+- passenger demand q_k,
+- desired departure and arrival times (continuous, in minutes),
+- slack time (flexibility),
+- shortest-path travel time,
+- continuous service, boarding, and alighting time windows.
 
-Outputs (continuous-time):
-    - taxi_like_requests.json
-    - bus_like_requests.json 
+The output requests are saved in JSON format and are NOT discretized.
 """
 
 import json
@@ -28,15 +24,6 @@ import networkx as nx
 from pathlib import Path
 import math
 import random
-
-
-
-# seed
-import random
-import numpy as np
-seed = 23
-random.seed(seed)
-np.random.seed(seed)
 
 
 
@@ -58,7 +45,7 @@ def compute_shortest_path_time(G: nx.Graph, origin: int, dest: int) -> float:
 ############################################
 #  Generate taxi-like requests (continuous):
 ############################################
-def generate_taxi_requests(
+def generate_requests(
     G: nx.Graph,
     num_requests: int,
     q_min: int = 1,
@@ -66,10 +53,12 @@ def generate_taxi_requests(
     slack_min: float = 20.0,
     time_horizon_max: float = 600.0,   # 10h
     depot: int = 0,
+    alpha: float = 0.65,
 ) -> list:
     """
     Generate taxi-like requests with continuous time fields.
     """
+
     requests = []
     nodes = list(G.nodes())
 
@@ -100,7 +89,6 @@ def generate_taxi_requests(
             q_values = list(range(q_min, q_max + 1))
 
             # exponential decay: weight(q) = exp(-alpha * (q-1))
-            alpha = 0.65
             q_weights = [math.exp(-alpha * (q - q_min)) for q in q_values]
 
             # normalize
@@ -177,11 +165,6 @@ def generate_taxi_requests(
 
 
 
-
-
-#######
-# MAIN:
-#######
 def load_network_as_graph(network_path: str) -> nx.DiGraph:
     """
     Load a network (GRID or CITY) from JSON and build a NetworkX DiGraph
@@ -207,6 +190,9 @@ def load_network_as_graph(network_path: str) -> nx.DiGraph:
 
     return G
 
+
+
+
 def save_requests(path: str, requests: list) -> None:
     """
     Save list of requests (dicts) to JSON.
@@ -218,39 +204,3 @@ def save_requests(path: str, requests: list) -> None:
         json.dump(requests, f, indent=2)
 
     #print(f"[INFO] Saved {len(requests)} requests to: {out_path}")
-
-
-
-
-
-### TEST MAIN ###
-if __name__ == "__main__":
-
-    network_path = "instances/GRID/3x3/network.json"   # Path to an already generated network
-
-    G = load_network_as_graph(network_path)  
-
-
-    # Parameters:
-    num_requests = 50
-    q_min = 1
-    q_max = 3
-    slack_min = 10         # in minutes
-
-    time_horizon_max = 60  # in minutes
-    number = 3 # side of the grid
-
-    # Generation of requests
-    taxi_requests = generate_taxi_requests(
-        G=G,
-        num_requests=num_requests,
-        q_min=q_min,
-        q_max=q_max,
-        slack_min=slack_min,
-        time_horizon_max=time_horizon_max,
-    )
-
-    # Save in the same directory
-    output_path = f"instances/GRID/{number}x{number}/taxi_like_requests_{int(time_horizon_max)}maxmin.json"
-    save_requests(output_path, taxi_requests)
-

@@ -44,7 +44,7 @@ if __name__ == "__main__":
     
 
     # I quattro modelli da confrontare
-    model_names = ["ab"] 
+    model_names = ["w"] 
 
     all_results = []
     exp_id = f"grid_n{number}_h{horizon}_m{num_modules}_r{num_requests}"

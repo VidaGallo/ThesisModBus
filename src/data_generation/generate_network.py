@@ -2,20 +2,21 @@
 Network Generator
 =================
 
-Creates the base transportation network used in the experiments.
-Supports two modes:
+This module creates the transportation networks used in the experiments.
 
-1. GRID network:
-   - Builds a side × side grid
+It supports:
+- GRID networks (regular side × side grids),
+- asymmetric GRID networks (random edge lengths),
+- CITY networks built from OpenStreetMap (OSM) and converted to a compact JSON format.
 
-2. CITY network:
-   - Loaded from OSM and normalized to the same JSON structure
+Each generated network is saved as JSON with:
+- nodes,
+- edges (with length_km and time_min),
+- basic metadata (type, size, speed, etc.).
 
-Output JSON contains:
-    - nodes
-    - edges
-    - metadata (e.g., type, grid size)
+Aoarsening/sparsification generator for larger CITY graphs is included ........ (in corso)
 """
+
 
 from __future__ import annotations
 
@@ -26,15 +27,6 @@ import random
 import osmnx as ox
 import networkx as nx
 import geopandas as gpd
-import os
-
-
-# seed
-import random
-import numpy as np
-seed = 23
-random.seed(seed)
-np.random.seed(seed)
 
 
 
@@ -139,26 +131,14 @@ def generate_grid_network_asym(
     side: int,
     edge_length_km: float = 1.0,
     speed_kmh: float = 40.0,
-    rel_std: float = 0.2,
+    rel_std: float = 0.2
 ) -> dict:
     """
     Generate a side × side GRID network with asymmetric edge lengths.
 
     Each directed edge (u -> v) gets a length drawn from a normal
     distribution with mean = edge_length_km and std = rel_std * edge_length_km.
-
-    Parameters:
-        side : int
-            Number of nodes per side (total nodes = side * side).
-        edge_length_km : float
-            Base mean length of each edge in kilometers (default: 1 km).
-        speed_kmh : float
-            Travel speed in km/h used to compute travel time.
-        rel_std : float
-            Relative standard deviation for the normal noise
-            (e.g. 0.2 -> std = 0.2 * edge_length_km).
     """
-
     # --- Nodes ---
     nodes = []
     for row in range(side):

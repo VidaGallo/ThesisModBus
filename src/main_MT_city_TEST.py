@@ -34,7 +34,7 @@ if __name__ == "__main__":
     slack_min = 30.0
 
     # Modelli da confrontare
-    model_names = ["ab"]
+    model_names = ["w"]
 
     # =====================================================
     #  LISTE DI PARAMETRI CHE VUOI VARIARE NEGLI ESPERIMENTI

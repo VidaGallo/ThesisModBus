@@ -2,20 +2,16 @@
 Data Generation Pipeline
 ========================
 
-This module provides a single high-level function, `generate_all_data()`,
-which creates the full dataset needed for the MILP model.
+This module builds the full input dataset for the MILP experiments.
 
-The pipeline performs:
-  1. Continuous GRID network generation.
-  2. Continuous taxi-like request generation.
-  3. Time discretization of both network and requests.
-  4. Automatic creation of the output folder structure.
+It provides high-level functions that:
+1) generate a continuous network (GRID / asymmetric GRID / CITY),
+2) generate continuous taxi-like requests on that network,
+3) discretize both network travel times and request time windows,
+4) save all files in a consistent folder structure.
 
-It returns the paths to the **discretized** network and request files,
-ready to be loaded into the Instance class.
-
-Usage (in main):
-    network_path, requests_path = generate_all_data(...)
+Each function returns the paths of the DISCRETIZED JSON files
+(network + requests), ready to be loaded into the Instance class.
 """
 
 
@@ -24,14 +20,16 @@ from pathlib import Path
 from .generate_network import *
 from .generate_demands import *
 from .time_discretization import *
-import random
 
-# seed
 import random
 import numpy as np
-seed = 23
-random.seed(seed)
-np.random.seed(seed)
+
+def set_seed(seed: int = 23):
+    random.seed(seed)
+    np.random.seed(seed)
+
+
+
 
 
 def generate_all_data(
@@ -42,7 +40,10 @@ def generate_all_data(
     q_min: int,
     q_max: int,
     slack_min: float,
-):
+    seed: int = 23,
+    mean_edge_length_km: float = 3.0,
+    mean_speed_kmh: float = 40.0
+    ):
     """
     Generate continuous network + continuous requests,
     then discretize both.
@@ -50,6 +51,7 @@ def generate_all_data(
     Returns:
       network_disc_path, requests_disc_path
     """
+    set_seed(seed)
 
     ### BUILD FOLDER
     base = f"instances/GRID/{number}x{number}"
@@ -65,8 +67,8 @@ def generate_all_data(
     ### GENERATE CONTINUOUS NETWORK
     network = generate_grid_network(
         side=number,
-        edge_length_km=3.0,
-        speed_kmh=40.0,
+        edge_length_km=mean_edge_length_km,
+        speed_kmh=mean_speed_kmh
     )
     save_network_json(network, base, filename="network.json")
 
@@ -74,13 +76,13 @@ def generate_all_data(
     ### GENERATE CONTINUOUS REQUESTS
     G = load_network_as_graph(network_cont)
 
-    taxi_requests = generate_taxi_requests(
+    taxi_requests = generate_requests(
         G=G,
         num_requests=num_requests,
         q_min=q_min,
         q_max=q_max,
         slack_min=slack_min,
-        time_horizon_max=float(horizon),
+        time_horizon_max=float(horizon)
     )
 
     save_requests(requests_cont, taxi_requests)
@@ -103,8 +105,6 @@ def generate_all_data(
     #print("\n[DATA GENERATION COMPLETE]")
     #print("Continuous and discrete data created in:", base)
 
-
-
     # RETURN PATHS FOR THE MAIN
     return network_disc, requests_disc
 
@@ -120,7 +120,10 @@ def generate_all_data_asym(
     q_min: int,
     q_max: int,
     slack_min: float,
-    depot: int
+    depot: int,
+    mean_edge_length_km: float = 3.33,
+    mean_speed_kmh: float = 40.0,
+    length_std: float = 0.66
 ):
     """
     Generate continuous network + continuous requests,
@@ -129,6 +132,7 @@ def generate_all_data_asym(
     Returns:
       network_disc_path, requests_disc_path
     """
+    set_seed(seed)
 
     ### BUILD FOLDER
     base = f"instances/GRID/{number}x{number}"
@@ -144,9 +148,9 @@ def generate_all_data_asym(
     ### GENERATE CONTINUOUS NETWORK
     network = generate_grid_network_asym(
         side=number,
-        edge_length_km=3.33,
-        speed_kmh=40.0,
-        rel_std = 0.66
+        edge_length_km=mean_edge_length_km,
+        speed_kmh=mean_speed_kmh,
+        rel_std = length_std
     )
     save_network_json(network, base, filename="network.json")
 
@@ -154,7 +158,7 @@ def generate_all_data_asym(
     ### GENERATE CONTINUOUS REQUESTS
     G = load_network_as_graph(network_cont)
 
-    taxi_requests = generate_taxi_requests(
+    taxi_requests = generate_requests(
         G=G,
         num_requests=num_requests,
         q_min=q_min,
@@ -206,7 +210,9 @@ def generate_all_data_city(
     q_min: int,
     q_max: int,
     slack_min: float,
-    depot: int
+    depot: int,
+    seed: int = 23,
+    mean_speed_kmh: float = 40.0,
 ):
     """
     Generate continuous network + continuous requests,
@@ -231,7 +237,7 @@ def generate_all_data_city(
     network = generate_grid_network_city(
         place = city,
         central_suburbs = central_suburbs,
-        speed_kmh = 40.0
+        speed_kmh = mean_speed_kmh
     )
     save_network_json(network, base, filename="network.json")
 
@@ -239,7 +245,7 @@ def generate_all_data_city(
     ### GENERATE CONTINUOUS REQUESTS
     G = load_network_as_graph(network_cont)
 
-    taxi_requests = generate_taxi_requests(
+    taxi_requests = generate_requests(
         G=G,
         num_requests=num_requests,
         q_min=q_min,

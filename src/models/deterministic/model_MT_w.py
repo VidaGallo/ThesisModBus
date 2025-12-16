@@ -1,25 +1,6 @@
-"""
-Taxi-like deterministic MILP model
-=================================
-- creation of a CPLEX/DOcplex model
-- creation of all the decision variables
-- addition of all the MILP constraints
-- addition of the objective function
-- return of the model and variables
-"""
-
-
 from docplex.mp.model import Model
 from utils.MT.instance_def import Instance
 
-
-
-# seed
-import random
-import numpy as np
-seed = 23
-random.seed(seed)
-np.random.seed(seed)
 
 
 

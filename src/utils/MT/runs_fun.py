@@ -190,20 +190,8 @@ def run_single_model(
     x = y = r = w = L = R = s = a = b = h = None
     D = U = z = kappa = None   # variabili TRAIL per i modelli con platoon
 
-    if  model_name == "ab":
+    if  model_name == "w":
         model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_ab(instance)
-    #elif model_name == "ab_LR":
-    #    model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR(instance)
-    #elif model_name == "ab_relax":
-    #    model, x, y, r, w, s, a, b = create_taxi_like_model_ab_relax(instance)
-    #elif model_name == "ab_LR_relax":
-    #    model, x, y, r, L, R, s, a, b = create_taxi_like_model_ab_LR_relax(instance)
-    #elif model_name == "ab_plat":
-        # deve restituire anche D, U, z, kappa, h
-    #    model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_taxi_like_model_ab_plat(instance)
-    #elif model_name == "ab_LR_plat":
-    #    # idem con L,R
-    #    model, x, y, r, L, R, s, a, b, D, U, z, kappa, h = create_taxi_like_model_ab_LR_plat(instance)
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
 
