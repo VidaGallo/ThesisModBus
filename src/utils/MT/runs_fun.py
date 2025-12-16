@@ -25,8 +25,7 @@ def build_instance_and_paths(
     num_trails: int,       # |P|
     Q: int,
     c_km: float,
-    c_uns: float,         
-    g_plat: float,
+    c_uns: float,   
     num_requests: int,
     q_min: int,
     q_max: int,
@@ -72,7 +71,6 @@ def build_instance_and_paths(
         Q=Q,
         c_km=c_km,
         c_uns=c_uns,
-        g_plat=g_plat,
         depot=depot,
         num_Nw=num_Nw,      # first N by degree
         z_max=z_max
@@ -98,7 +96,6 @@ def build_instance_and_paths_city(
     Q: int,
     c_km: float,
     c_uns: float,
-    g_plat: float,
     num_requests: int,
     q_min: int,
     q_max: int,
@@ -141,7 +138,6 @@ def build_instance_and_paths_city(
         Q=Q,
         c_km=c_km,
         c_uns=c_uns,
-        g_plat=g_plat,
         depot=depot,
         num_Nw=num_Nw,          # first N by degree
         z_max=z_max
@@ -171,7 +167,6 @@ def run_single_model(
     Q: int,
     c_km: float,
     c_uns: float,
-    g_plat: float,
     num_requests: int,
     q_min: int,
     q_max: int,
@@ -319,7 +314,6 @@ def run_single_model(
         "Q": Q,
         "c_km": c_km,
         "c_uns": c_uns,
-        "g_plat": g_plat,
         "num_requests": num_requests,
         "served": served,
         "served_ratio": served_ratio,
@@ -370,7 +364,6 @@ def run_single_model_city(
     Q: int,
     c_km: float,
     c_uns: float,
-    g_plat: float,
     num_requests: int,
     q_min: int,
     q_max: int,
@@ -514,7 +507,6 @@ def run_single_model_city(
         "Q": Q,
         "c_km": c_km,
         "c_uns": c_uns,
-        "g_plat": g_plat,
         "num_requests": num_requests,
         "served": served,
         "served_ratio": served_ratio,
@@ -549,89 +541,3 @@ def run_single_model_city(
 
 
 
-
-# ======================================================================
-#  BUILD INSTANCE - GRID (ASYMMETRIC)
-# ======================================================================
-
-def run_parallel_exact_vs_heur(
-    *,
-    mode: str,                 # "GRID" o "CITY"
-    exp_id: str,
-    base_out: Path,
-    instance, network_path, requests_path, t_max,
-    exact_runner,              # funzione tipo run_single_model or run_single_model_city
-    exact_kwargs: dict,        # kwargs aggiuntivi per exact_runner
-    heur_runner,               # tua black box (anche dummy per ora)
-    heur_kwargs: dict,         # kwargs per heuristic
-    meta: dict,                # roba comune da attaccare ai risultati
-):
-    base_out = Path(base_out) / exp_id
-    out_exact = base_out / "EXACT"
-    out_heur  = base_out / "HEUR"
-    out_exact.mkdir(parents=True, exist_ok=True)
-    out_heur.mkdir(parents=True, exist_ok=True)
-
-    results = []
-
-    # -------------------------
-    # A) HEURISTIC (black box)
-    # -------------------------
-    t0 = time.perf_counter()
-    try:
-        res_heur = heur_runner(
-            instance=instance,
-            network_path=network_path,
-            requests_path=requests_path,
-            t_max=t_max,
-            output_folder=out_heur,
-            **heur_kwargs
-        )
-        if res_heur is None:
-            res_heur = {}
-        res_heur["status"] = res_heur.get("status", "OK")
-    except Exception as e:
-        res_heur = {"status": "ERROR", "error": str(e)}
-    res_heur["wall_time_sec"] = time.perf_counter() - t0
-    res_heur["method"] = "HEUR"
-    res_heur.update(meta)
-    results.append(res_heur)
-
-    # -------------------------
-    # B) EXACT (già esistente)
-    # -------------------------
-    t0 = time.perf_counter()
-    try:
-        res_exact = exact_runner(
-            instance=instance,
-            network_path=network_path,
-            requests_path=requests_path,
-            t_max=t_max,
-            base_output_folder=out_exact,
-            **exact_kwargs
-        )
-        res_exact["status"] = res_exact.get("status", "OK")
-    except Exception as e:
-        res_exact = {"status": "ERROR", "error": str(e)}
-    res_exact["wall_time_sec"] = time.perf_counter() - t0
-    res_exact["method"] = "EXACT"
-    res_exact.update(meta)
-    results.append(res_exact)
-
-    # -------------------------
-    # SAVE comparison
-    # -------------------------
-    df = pd.DataFrame(results)
-
-    # ordine colonne “bello”
-    first_cols = ["method", "status", "objective", "obj_value", "served", "served_ratio",
-                  "solve_time_sec", "total_time_sec", "wall_time_sec", "mip_gap", "error"]
-    cols = [c for c in first_cols if c in df.columns] + [c for c in df.columns if c not in first_cols]
-    df = df[cols]
-
-    df.to_csv(base_out / "comparison.csv", index=False)
-    with open(base_out / "meta.json", "w", encoding="utf-8") as f:
-        json.dump(meta, f, indent=2)
-
-    print("Saved:", base_out / "comparison.csv")
-    return df

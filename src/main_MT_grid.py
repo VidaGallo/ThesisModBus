@@ -24,7 +24,6 @@ if __name__ == "__main__":
     rel_std = 0.66
     c_km = 1.0
     c_uns = 100
-    g_plat = None
 
     num_Nw = 2    # n°nodi che permettono lo scambio
 
@@ -66,7 +65,6 @@ if __name__ == "__main__":
         Q=Q,
         c_km=c_km,
         c_uns=c_uns,
-        g_plat=g_plat,
         num_requests=num_requests,
         q_min=q_min,
         q_max=q_max,
@@ -120,8 +118,7 @@ if __name__ == "__main__":
             z_max=z_max,
             Q=Q,
             c_km=c_km,
-            c_uns=c_uns,          
-            g_plat=g_plat,
+            c_uns=c_uns,       
             num_requests=num_requests,
             q_min=q_min,
             q_max=q_max,

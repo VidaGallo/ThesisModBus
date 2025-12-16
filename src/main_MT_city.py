@@ -30,7 +30,6 @@ if __name__ == "__main__":
     mean_speed_kmh = 40.0
     c_km = 1.0
     c_uns = 100
-    g_plat = None
 
 
     num_Nw = 3    # n°nodi che permettono lo scambio
@@ -72,7 +71,6 @@ if __name__ == "__main__":
         Q=Q,
         c_km=c_km,
         c_uns=c_uns,
-        g_plat=g_plat,
         num_requests=num_requests,
         q_min=q_min,
         q_max=q_max,
@@ -125,7 +123,6 @@ if __name__ == "__main__":
             Q=Q,
             c_km=c_km,
             c_uns=c_uns,
-            g_plat=g_plat,
             num_requests=num_requests,
             q_min=q_min,
             q_max=q_max,

@@ -23,7 +23,6 @@ if __name__ == "__main__":
     mean_speed_kmh = 40.0
     c_km = 1.0
     c_uns = 100
-    g_plat = None
 
     q_min = 1
     q_max = 10
@@ -114,7 +113,6 @@ if __name__ == "__main__":
             Q=Q,
             c_km=c_km,
             c_uns=c_uns,
-            g_plat=g_plat,
             num_requests=num_requests,
             q_min=q_min,
             q_max=q_max,
@@ -169,7 +167,6 @@ if __name__ == "__main__":
                 Q=Q,
                 c_km=c_km,
                 c_uns=c_uns,
-                g_plat=g_plat,
                 num_requests=num_requests,
                 q_min=q_min,
                 q_max=q_max,
