@@ -1,4 +1,4 @@
-from utils.MT.runs_fun import *
+from utils.runs_fun import *
 
 import pandas as pd
 from pathlib import Path
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     depot = 1198867366   # Centro Torino
 
     Q = 10
-    mean_speed_kmh = 40.0
+    mean_speed_kmh = 100.0
     c_km = 1.0
     c_uns = 100
 
@@ -48,10 +48,10 @@ if __name__ == "__main__":
     slack_min = 10.0
 
     # Parametri SPECIFICI
-    num_modules   = 1
-    num_trails    = 6
+    num_modules   = 2
+    num_trails    = 3
     z_max         = 3      # max trail per main
-    num_requests  = 2
+    num_requests  = 10
     
 
     # Nomi dei modelli da eseguire
@@ -107,11 +107,9 @@ if __name__ == "__main__":
     # 2) cartella base per l'esperimento
     base_folder = build_output_folder(
         base_dir="results",
-        network_path=network_path,
-        t_max=instance.t_max,
-        dt=instance.dt,
+        network_path=network_path
     )
-    base_folder = base_folder / f"{exp_id}"
+    base_folder = base_folder / subdir / f"{exp_id}"
     base_folder.mkdir(parents=True, exist_ok=True)
 
 
@@ -153,7 +151,7 @@ if __name__ == "__main__":
         f"K{num_requests}_"
         f"Nw{num_Nw}.csv"
     )
-    summary_path = base_folder / model_name
+    summary_path = base_folder / model_name / summary_name
     df_results.to_csv(summary_path, index=False)
 
     #print(f"\nSummary saved to: {summary_path}")

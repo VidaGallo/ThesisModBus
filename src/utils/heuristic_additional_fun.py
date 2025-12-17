@@ -372,69 +372,62 @@ def fict7d_to_requests_format(
 
 
 # Per ora k-means, in futuro Bayes
-def make_fictitious_requests_from_remaining_list(
-    remaining: List[Dict],
-    n_fict: int = 4,
-    use_capacity: bool = True,      # True = 7D (aggiunge q)
-    capacity_key: str = "q",
+Request7D = Dict[str, float | int]
+def make_fictitious_requests_kmeans_7d(
+    remaining: List[Request7D],
+    n_fict: int,
+    *,
     standardize: bool = True,
     random_state: int = 23,
-) -> Tuple[List[Dict], List[Dict], np.ndarray]:
+    n_init: int = 10,
+) -> Tuple[List[Request7D], np.ndarray]:
     """
-    Crea n_fict richieste fittizie usando SOLO 'remaining' (già filtrate).
+    Crea n_fict richieste fittizie da remaining (SEMPRE 7D: xo,yo,tP,xd,yd,tD,q)
 
     Return:
-      fict_reqs: lista dict (6D/7D) con k fittizio negativo
-      remaining: stessa lista remaining (ritornata per comodità)
-      labels: cluster id per ogni elemento di remaining
+      fict_reqs : lista dict con k negativo, + n_agg
+      labels    : cluster label per ogni elemento di remaining
     """
     if len(remaining) < n_fict:
         raise ValueError(f"Too few remaining requests ({len(remaining)}) to make {n_fict} fictitious.")
 
-    def vec(r):
-        base = [r["xo"], r["yo"], r["tP"], r["xd"], r["yd"], r["tD"]]
-        if use_capacity:
-            base.append(r[capacity_key])
-        return np.array(base, dtype=float)
+    # matrice (K,7)
+    X = np.array(
+        [[r["xo"], r["yo"], r["tP"], r["xd"], r["yd"], r["tD"], r["q"]] for r in remaining],
+        dtype=float,
+    )
 
-    X = np.vstack([vec(r) for r in remaining])
-
-    # standardize
     if standardize:
         mu = X.mean(axis=0)
-        sd = np.std(X, axis=0)
+        sd = X.std(axis=0)
         sd = np.maximum(sd, 1e-8)
         Xn = (X - mu) / sd
     else:
         Xn = X
 
-    # clustering
-    kmeans = KMeans(n_clusters=n_fict, random_state=random_state, n_init=10)
+    kmeans = KMeans(n_clusters=n_fict, random_state=random_state, n_init=n_init)
     labels = kmeans.fit_predict(Xn)
 
-    # build fictitious requests (mean in raw space, capacity sum)
-    fict_reqs = []
+    fict_reqs: List[Request7D] = []
     for c in range(n_fict):
         idx = np.where(labels == c)[0]
         cluster = [remaining[i] for i in idx]
-
-        xo = float(np.mean([r["xo"] for r in cluster]))
-        yo = float(np.mean([r["yo"] for r in cluster]))
-        tP = float(np.mean([r["tP"] for r in cluster]))
-        xd = float(np.mean([r["xd"] for r in cluster]))
-        yd = float(np.mean([r["yd"] for r in cluster]))
-        tD = float(np.mean([r["tD"] for r in cluster]))
-        q  = int(np.sum([r.get(capacity_key, 0) for r in cluster])) if use_capacity else int(np.sum([r.get("q", 0) for r in cluster]))
+        if not cluster:
+            continue
 
         fict_reqs.append({
             "k": -(c + 1),
-            "xo": xo, "yo": yo, "tP": tP,
-            "xd": xd, "yd": yd, "tD": tD,
-            "q": q,
+            "xo": float(np.mean([r["xo"] for r in cluster])),
+            "yo": float(np.mean([r["yo"] for r in cluster])),
+            "tP": float(np.mean([r["tP"] for r in cluster])),
+            "xd": float(np.mean([r["xd"] for r in cluster])),
+            "yd": float(np.mean([r["yd"] for r in cluster])),
+            "tD": float(np.mean([r["tD"] for r in cluster])),
+            "q":  int(np.sum([r["q"] for r in cluster])),   # aggrego capacità
             "n_agg": int(len(cluster)),
         })
 
-    return fict_reqs, remaining, labels
+    return fict_reqs, labels
 
 
 

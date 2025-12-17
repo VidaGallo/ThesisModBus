@@ -1,117 +1,59 @@
-from utils.MT.heuristic_prob_fun import *
-from utils.MT.runs_fun import *
-
-
-import random
-import numpy as np
-import pandas as pd
+from utils.MT.heuristic_prob_fun import run_heu_model
+from utils.MT.runs_fun import build_instance_and_paths, run_single_model
+import random, numpy as np, pandas as pd
 from pathlib import Path
 
-
-# =========================
-# FLAGS
-# =========================
-RUN_EXACT = True     # False → salta CPLEX
-RUN_HEUR  = True     # False → salta HEURISTIC
-
+RUN_EXACT = True
+RUN_HEUR  = True
 
 def set_seed(seed: int):
-    random.seed(seed)
-    np.random.seed(seed)
+    random.seed(seed); np.random.seed(seed)
 
-
-CPLEX_CFG = {
-    "time_limit": 36_000,     # seconds
-    "mip_gap": 0.01,          # relative MIP gap, 0.05 = 5%
-    "abs_mip_gap": 1e-6,      # absolute MIP gap
-    "threads": 0,             # 0 = all available threads
-    "mip_display": 1,         # 0..5 (2 = default)
-    "emphasis_mip": 2,        # 0 balanced, 1 feasibility, 2 optimality, ...
-    "parallel": 0             # 0 auto, 1 opportunistic, 2 deterministic
-}
-
+CPLEX_CFG = {...}
 
 if __name__ == "__main__":
-
-    # =========================
-    # EXPERIMENT PARAMS
-    # =========================
-
-    ### SEED 
     seed = 23
     set_seed(seed)
 
-    ### GRID (ASYM) PARAMS
+    # params...
     number = 2
-    mean_speed_kmh = 40.0
-    mean_edge_length_km = 3.33
-    rel_std = 0.66
-    num_Nw = 2     
-    depot = 0      
-    
-    ### REQUEST PARAMS
-    num_requests = 3        
+    horizon = 108
+    dt = 6
+    depot = 0
+    num_requests = 3
     q_min, q_max = 1, 10
     alpha = 0.65
-    slack_min = 20.0         
-
-    ### TIME PARAMS
-    horizon = 108         
-    dt = 6
-    
-    ### MODULE PARAMS
+    slack_min = 20.0
     Q = 10
     c_km = 1.0
     c_uns = 100.0
     num_modules = 2
     num_trails = 6
     z_max = 3
+    num_Nw = 2
+    mean_speed_kmh = 40.0
+    mean_edge_length_km = 3.33
+    rel_std = 0.66
+    model_name = "w"
 
-    ### MODEL & EXPERIMENT NAME
-    model_name = "w"  
-    exp_id = (
-        f"GRID_n{number}_H{horizon}_dt{dt}_"
-        f"M{num_modules}_P{num_trails}_Z{z_max}_"
-        f"K{num_requests}_Nw{num_Nw}_seed{seed}"
-    )
+    exp_id = f"GRID_n{number}_H{horizon}_dt{dt}_M{num_modules}_P{num_trails}_Z{z_max}_K{num_requests}_Nw{num_Nw}_seed{seed}"
 
-    print("\n" + "=" * 80)
-    print(f"EXPERIMENT {exp_id}")
-    print("=" * 80)
-
-    ### OUTPUT FOLDERS
     base = Path("results") / "GRID" / "MT" / exp_id
     paths = {
         "base": base,
         "exact": base / "exact",
         "heur": base / "heuristic_prob",
         "summary": base / "summary",
-        "plots": base / "plots",
     }
-    for p in paths.values():
-        p.mkdir(parents=True, exist_ok=True)
+    for p in paths.values(): p.mkdir(parents=True, exist_ok=True)
 
-
-
-    # =========================
-    # BUILD INSTANCE (ONCE)
-    # =========================
     instance, network_cont_path, requests_cont_path, network_disc_path, requests_disc_path, t_max = build_instance_and_paths(
-        number=number,
-        horizon=horizon,
-        dt=dt,
-        num_modules=num_modules,
-        num_trails=num_trails,
-        Q=Q,
-        c_km=c_km,
-        c_uns=c_uns,
-        num_requests=num_requests,
-        q_min=q_min,
-        q_max=q_max,
-        slack_min=slack_min,
-        depot=depot,
-        seed=seed,
-        num_Nw=num_Nw,
+        number=number, horizon=horizon, dt=dt,
+        num_modules=num_modules, num_trails=num_trails,
+        Q=Q, c_km=c_km, c_uns=c_uns,
+        num_requests=num_requests, q_min=q_min, q_max=q_max,
+        slack_min=slack_min, depot=depot,
+        seed=seed, num_Nw=num_Nw,
         mean_edge_length_km=mean_edge_length_km,
         mean_speed_kmh=mean_speed_kmh,
         rel_std=rel_std,
@@ -119,69 +61,57 @@ if __name__ == "__main__":
         alpha=alpha,
     )
 
-    print("\nData used:")
-    print(" network :", network_path)
-    print(" requests:", requests_path)
+    print("Data used:")
+    print(" network_cont :", network_cont_path)
+    print(" requests_cont:", requests_cont_path)
+    print(" network_disc :", network_disc_path)
+    print(" requests_disc:", requests_disc_path)
 
-
-
-
-    # =========================
-    # EXACT (CPLEX)
-    # =========================
-    exact_results = []
-
+    # EXACT
     if RUN_EXACT:
-        print("\n" + "=" * 80)
-        print("RUNNING EXACT (model = w)")
-        print("=" * 80)
-
-        res = run_single_model(
-            instance=instance,
-            model_name=model_name,
-            network_path=network_path,
-            requests_path=requests_path,
-            number=number,
-            horizon=horizon,
-            q_min=q_min,
-            q_max=q_max,
-            alpha=alpha,
-            slack_min=slack_min,
-            seed=seed,
-            exp_id=exp_id,
+        res_exact = run_single_model(
+            instance=instance, model_name=model_name,
+            network_path=network_disc_path,      # <-- FIX
+            requests_path=requests_disc_path,    # <-- FIX
+            number=number, horizon=horizon,
+            q_min=q_min, q_max=q_max,
+            alpha=alpha, slack_min=slack_min,
+            seed=seed, exp_id=exp_id,
             mean_edge_length_km=mean_edge_length_km,
             mean_speed_kmh=mean_speed_kmh,
             rel_std=rel_std,
             base_output_folder=paths["exact"],
-            cplex_cfg=CPLEX_CFG      # possibility of early stopping/feasable but not optimal
+            cplex_cfg=CPLEX_CFG,
         )
+        pd.DataFrame([res_exact]).to_csv(paths["summary"]/ "summary_exact.csv", index=False)
 
-        exact_results.append(res)
-        df_exact = pd.DataFrame(exact_results)
-        df_exact.to_csv(paths["summary"] / "summary_exact.csv", index=False)
-
-    else:
-        print("\n[SKIP] EXACT disabled")
-
-
-
-
-
-
-    # =========================
     # HEURISTIC
-    # =========================
     if RUN_HEUR:
-        print("\n" + "=" * 80)
-        print("RUNNING HEURISTIC")
-        print("=" * 80)
+        res_heu = run_heu_model(
+            instance=instance,
+            model_name=model_name,
+            network_cont_path=network_cont_path,
+            requests_cont_path=requests_cont_path,
+            network_disc_path=network_disc_path,
+            requests_disc_path=requests_disc_path,
+            number=number, horizon=horizon, dt=dt,
+            num_modules=num_modules, num_trails=num_trails,
+            c_km=c_km, c_uns=c_uns,
+            depot=depot, num_Nw=num_Nw,
+            z_max=z_max, t_max=t_max,
+            q_min=q_min, q_max=q_max, Q=Q,
+            alpha=alpha, slack_min=slack_min,
+            seed=seed, exp_id=exp_id,
+            mean_edge_length_km=mean_edge_length_km,
+            mean_speed_kmh=mean_speed_kmh,
+            rel_std=rel_std,
+            base_output_folder=paths["heur"],
+            cplex_cfg=CPLEX_CFG,
+        )
+        pd.DataFrame([res_heu]).to_csv(paths["summary"]/ "summary_heur.csv", index=False)
 
-
-
-    else:
-        print("\n[SKIP] HEURISTIC disabled")
-
-    print("\n" + "#" * 80)
-    print("DONE")
-    print("Outputs in:", paths["base"])
-    print("#" * 80)
+    # MERGE SUMMARY
+    rows = []
+    if RUN_EXACT: rows.append(res_exact)
+    if RUN_HEUR:  rows.append(res_heu)
+    pd.DataFrame(rows).to_csv(paths["summary"]/ "summary_all.csv", index=False)

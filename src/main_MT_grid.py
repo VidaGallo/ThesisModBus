@@ -1,4 +1,4 @@
-from utils.MT.runs_fun import *
+from utils.runs_fun import *
 
 import pandas as pd
 from pathlib import Path
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     # Parametri SPECIFICI
     number        = 2      # lato griglia
     num_modules   = 2
-    num_trails    = 6
+    num_trails    = 4
     z_max         = 3      # max trail per main
     num_requests  = 3
     
@@ -153,7 +153,7 @@ if __name__ == "__main__":
         f"Nw{num_Nw}_models.csv"   
     )
 
-    summary_path = base_folder / model_name
+    summary_path = base_folder / model_name / summary_name
     df_results.to_csv(summary_path, index=False)
 
     #print(f"\nSummary saved to: {summary_path}")

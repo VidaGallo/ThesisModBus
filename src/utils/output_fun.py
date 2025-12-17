@@ -14,7 +14,7 @@ from docplex.mp.model import Model
 
 
 
-def build_output_folder(base_dir: str, network_path: str, t_max: int, dt: int):
+def build_output_folder(base_dir: str, network_path: str):
     """
     Build a structured folder for logs and results:
 
