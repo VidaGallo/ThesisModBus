@@ -96,7 +96,7 @@ if __name__ == "__main__":
     # =========================
     # BUILD INSTANCE (ONCE)
     # =========================
-    instance, network_path, requests_path, t_max = build_instance_and_paths(
+    instance, network_cont_path, requests_cont_path, network_disc_path, requests_disc_path, t_max = build_instance_and_paths(
         number=number,
         horizon=horizon,
         dt=dt,

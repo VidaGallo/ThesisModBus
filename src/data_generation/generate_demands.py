@@ -27,9 +27,7 @@ import random
 
 
 
-############################
-# SHORTEST PATH (with time):
-############################
+
 def compute_shortest_path_time(G: nx.Graph, origin: int, dest: int) -> float:
     """
     Compute shortest-path travel time in minutes using edge attribute 'time_min'.

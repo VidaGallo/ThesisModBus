@@ -51,7 +51,7 @@ def build_instance_and_paths(
     t_max = horizon // dt
 
     # Generating asym grid
-    network_path, requests_path = generate_all_data_asym(
+    network_cont_path, requests_cont_path, network_path, requests_path = generate_all_data_asym(
         number=number,
         horizon=horizon,
         dt=dt,
@@ -83,7 +83,7 @@ def build_instance_and_paths(
         z_max=z_max
     )
 
-    return instance, network_path, requests_path, t_max
+    return instance, network_cont_path, requests_cont_path, network_path, requests_path, t_max
 
 
 
@@ -120,7 +120,7 @@ def build_instance_and_paths_city(
     t_max = horizon // dt
 
     # Generating network from a city
-    network_path, requests_path = generate_all_data_city(
+    network_cont_path, requests_cont_path, network_path, requests_path = generate_all_data_city(
         city=city,
         subdir=subdir,
         central_suburbs=central_suburbs,
@@ -151,7 +151,7 @@ def build_instance_and_paths_city(
         z_max=z_max
     )
 
-    return instance, network_path, requests_path, t_max
+    return instance, network_cont_path, requests_cont_path, network_path, requests_path, t_max
 
 
 
@@ -575,6 +575,14 @@ def mini_routing(
     network_path = Path(network_path)
     base_output_folder = Path(base_output_folder)
 
+
+
+    discretize_requests(
+        input_path=requests_cont,
+        output_path=requests_disc,
+        time_step_min=float(dt),
+    )
+
     # ----------------
     # Load instance
     # ----------------
@@ -658,9 +666,11 @@ def mini_routing(
 # ======================================================================
 def run_heu_prob_model(
     instance: Instance,
-    model_name: str,
-    network_path,            ### full name!
-    requests_path,           ### full name!
+    model_name: str,         ### Name of the heuristic
+    network_cont_path, 
+    requests_cont_path, 
+    network_disc_path, 
+    requests_disc_path,          
     number: int,
     horizon: int,
     q_min: int,
@@ -672,7 +682,7 @@ def run_heu_prob_model(
     mean_edge_length_km: float,
     mean_speed_kmh: float,
     rel_std: float,
-    base_output_folder,   
+    base_output_folder,     ### Folder for results
     cplex_cfg: dict | None = None,
     keep: int = 4,
     fict: int = 3,
@@ -685,14 +695,13 @@ def run_heu_prob_model(
     Euristica basata su sentizzazione per prob. su una stessa Instance (GRID).
     """
 
-
-    original_reqs = load_original_requests(str(requests_path))
+    original_reqs = load_original_requests(str(requests_cont_path))
     original_ids = [r["id"] for r in original_reqs]
 
-
-    G, req6d, node_xy = build_req6d_from_paths(
-        network_path=network_path,      
-        requests_path=requests_path,  
+    ### Working with continuous requests and network
+    G, req7d, node_xy = build_req7d_from_paths(
+        network_path=network_cont_path,      
+        requests_path=requests_cont_path,  
     )
     
     original_ids_old = original_ids.copy()

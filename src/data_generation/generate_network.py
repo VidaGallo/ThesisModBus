@@ -35,7 +35,6 @@ import geopandas as gpd
 #################
 # GRID GENERATOR:
 #################
-
 def generate_grid_network(
     output_path,
     side: int,
@@ -210,9 +209,9 @@ def generate_grid_network_asym(
 
 
 
-############################
-# NETWORK GENERATOR - TURIN:
-############################
+#####################################
+# SPECIFIC NETWORK GENERATOR - TURIN:
+#####################################
 def plot_city_suburb_network(
     osm_graph,
     network_dict: dict,
@@ -961,109 +960,14 @@ def generate_grid_network_city(
 
 
 
-"""
-### TEST MAIN ###
-if __name__ == "__main__":
-    place = "Torino, Italia",
-    name = "Torino",
-    city_output_folder = "instances/CITY/TORINO_SUB",
-    central_suburbs = ["Centro", "Crocetta", "Santa Rita", "Aurora"],
-
-    # 1) RAW network
-    city_network_raw, osm_graph = generate_city_network_raw(
-        place=place,
-        default_speed_kmh=40.0,
-        plot=True,
-        k_lateral=2,
-        k_center=4,
-        central_suburbs=central_suburbs
-    )
-
-    
-
-    merge_groups = [
-        ("Vanchiglia", "Vanchiglietta", "Madonna del Pilone"),
-        ("Madonna di Campagna", "Borgo Vittoria"),
-        ("San Donato", "Campidoglio", "Cit Turin"),
-        ("Cenisia", "Borgo San Paolo"),
-        ("Regio Parco", "Barca"),
-        ("Lingotto", "Filadelfia"),
-        ("Parella", "Pozzo Strada"),
-        ("Vallette", "Lucento"),
-        ("Villaretto", "Falchera")
-
-    ]
-
-    # 2) MERGED network (starting from RAW)
-    city_network_merged = generate_city_network_merged(
-        osm_graph=osm_graph,
-        base_network=city_network_raw,
-        merge_groups=merge_groups,
-        place=place,
-        plot=True,
-    )
-
-    remove_edges = [
-        ("San Donato + Campidoglio + Cit Turin", "Crocetta"),
-        ("Rebaudengo", "Regio Parco + Barca"),
-        ("Borgo Po", "Vanchiglia + Vanchiglietta + Madonna del Pilone"),
-        ("Madonna di Campagna + Borgo Vittoria", "Aurora"),
-        ("Vallette + Lucento", "Barriera di Lanzo"),
-        ("Vallette + Lucento", "Parella + Pozzo Strada"),
-        ("Santa Rita",  "Cenisia + Borgo San Paolo")
-    ]
-    add_edges = [
-        ("San Donato + Campidoglio + Cit Turin", "Centro"),
-        ("Centro", "Crocetta"),
-        #("Vallette + Lucento", "San Donato + Campidoglio + Cit Turin"),
-        ("Regio Parco + Barca", "Barriera di Milano"),
-        ("Santa Rita", "Crocetta"),
-        #("San Donato + Campidoglio + Cit Turin", "Aurora"),
-        #("Vanchiglia + Vanchiglietta + Madonna del Pilone", "Aurora"),
-        ("Madonna di Campagna + Borgo Vittoria", "Barriera di Milano"),
-        ("Vallette + Lucento", "Madonna di Campagna + Borgo Vittoria"),
-        ("San Donato + Campidoglio + Cit Turin", "Madonna di Campagna + Borgo Vittoria") 
-    ]
-
-    # 3) REWORKED network (starting from MERGED)
-    city_network_final = generate_city_network_reworked(
-        osm_graph=osm_graph,
-        base_network=city_network_merged,
-        place=place,
-        remove_edges=remove_edges,
-        add_edges=add_edges,
-        plot=True,
-    )
-
-    # 4) Convert to directed 
-    city_network_directed = make_network_directed(city_network_final)
-
-    # 5) Print
-    num_nodes = len(city_network_directed["nodes"])
-    num_edges = len(city_network_directed["edges"])
-    print(f"# NODI FINALI:    {num_nodes}")
-    print(f"# ARCHI FINALI:   {num_edges} (diretti, andata+ritorno)")
-
-    # 6) Save
-    save_network_json(
-        network_dict=city_network_directed,
-        output_dir=city_output_folder,
-        filename=f"network_{name}_directed.json",
-    )
-
-"""
 
 
 
+########################################################
+# GENERIC NETWORK GENERATOR - COEARSENING/SPARSIFICATION:
+########################################################
 
-
-
-
-
-#################################################
-# NETWORK GENERATOR - COEARSENING/SPARSIFICATION:
-#################################################
-
+### Mettere che se si ha in ingresso un nmeor masismo di archi si considera anche quello!!!! altrimenti si usa quel che viene
 
 """
 PSEUDOCODE:

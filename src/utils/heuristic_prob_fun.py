@@ -20,8 +20,9 @@ def pick_original_by_ids(original_reqs: List[Dict], selected_ids: List[int]) -> 
 
 
 
-def load_network_continuous_as_graph(network_path: str) -> nx.DiGraph:
-    with open(network_path, "r", encoding="utf-8") as f:
+### Load the original continuous graph
+def load_network_continuous_as_graph(network_cont_path: str) -> nx.DiGraph:
+    with open(network_cont_path, "r", encoding="utf-8") as f:
         net = json.load(f)
 
     G = nx.DiGraph()
@@ -37,11 +38,15 @@ def load_network_continuous_as_graph(network_path: str) -> nx.DiGraph:
     return G
 
 
+
+
 def shortest_path_time_min(G: nx.DiGraph, u: int, v: int) -> float:
     return nx.shortest_path_length(G, source=u, target=v, weight="time_min")
 
 
-def build_requests_4d_from_file(requests_path: str) -> List[Dict]:
+
+
+def build_requests_5d_from_file(requests_path: str) -> List[Dict]:
     """
     One point per request k.
     Returns list of dict:
@@ -68,7 +73,7 @@ def build_requests_4d_from_file(requests_path: str) -> List[Dict]:
 
 
 Request = Dict[str, Any]
-def build_req6d_from_paths(
+def build_req7d_from_paths(
     network_path,
     requests_path,
     *,
@@ -81,21 +86,21 @@ def build_req6d_from_paths(
 
     Returns:
         G       : grafo nx.DiGraph
-        req6d   : lista richieste con campi 6d + cap
+        req7d   : lista richieste con campi 6d + cap
         node_xy : embedding {node_id: (x,y)}
     """
     # loading
     G = load_network_continuous_as_graph(str(network_path))
-    req4d = build_requests_4d_from_file(str(requests_path))
+    req4d = build_requests_5d_from_file(str(requests_path))
 
     # embedding
     node_xy = mds_embed_nodes_from_sp(
         G, weight=sp_weight, symmetrize=symmetrize, dim=dim
     )
-    req6d = build_requests_6d_from_4d(req4d, node_xy)
+    req6d = build_requests_7d_from_5d(req4d, node_xy)
 
 
-    return G, req6d, node_xy
+    return G, req7d, node_xy
 
 
 
@@ -265,7 +270,7 @@ def mds_embed_nodes_from_sp(
     return coord
 
 
-def build_requests_6d_from_4d(
+def build_requests_5d_from_4d(
     req4d: List[Dict],
     node_xy: Dict[int, np.ndarray],
 ) -> List[Dict]:
@@ -385,28 +390,6 @@ def topk_closest_to_centroid(
     top_reqs = [req6d[i] for i in idx_top]
     top_dist = dist[idx_top]
     return idx_top, top_reqs, top_dist, c
-
-
-def print_topk(reqs: List[Dict], dists: np.ndarray, use_capacity: bool = False):
-    tag = "7D" if use_capacity else "6D"
-    print(f"\n--- Top closest to centroid ({tag}) ---")
-    for r, d in zip(reqs, dists):
-        if use_capacity:
-            print(
-                f"k={r['k']:2d} | "
-                f"O=({r['xo']:.3f},{r['yo']:.3f}) "
-                f"D=({r['xd']:.3f},{r['yd']:.3f}) "
-                f"tP={r['tP']:.2f} tD={r['tD']:.2f} q={r['q']} "
-                f"| dist={d:.4f}"
-            )
-        else:
-            print(
-                f"k={r['k']:2d} | "
-                f"O=({r['xo']:.3f},{r['yo']:.3f}) "
-                f"D=({r['xd']:.3f},{r['yd']:.3f}) "
-                f"tP={r['tP']:.2f} tD={r['tD']:.2f} "
-                f"| dist={d:.4f}"
-            )
 
 
 

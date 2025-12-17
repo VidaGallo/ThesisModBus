@@ -93,7 +93,6 @@ def discretize_requests(
 
 
 
-
 def discretize_network_travel_times(
     input_path: str,
     output_path: str,

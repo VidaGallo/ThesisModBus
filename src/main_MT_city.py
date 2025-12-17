@@ -69,7 +69,7 @@ if __name__ == "__main__":
     print("="*80)
 
     # 1) genera dati + istanza UNA volta sola
-    instance, network_path, requests_path, t_max = build_instance_and_paths_city(
+    instance, _, _, network_path, requests_path, t_max = build_instance_and_paths_city(
         city=city,      # city name
         subdir=subdir,     # subdirectory name
         central_suburbs=central_suburbs,

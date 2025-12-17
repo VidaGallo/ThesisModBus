@@ -37,8 +37,6 @@ def set_seed(seed: int) -> random.Random:
 
 
 
-
-
 def generate_all_data(
     number: int,
     horizon: int,
@@ -118,9 +116,7 @@ def generate_all_data(
     )
 
     # Return paths
-    return network_disc, requests_disc
-
-
+    return network_cont, requests_cont, network_disc, requests_disc
 
 
 
@@ -209,11 +205,7 @@ def generate_all_data_asym(
 
 
     # Return paths
-    return network_disc, requests_disc
-
-
-
-
+    return network_cont, requests_cont, network_disc, requests_disc
 
 
 
@@ -305,7 +297,7 @@ def generate_all_data_city(
     )
 
     # Return paths
-    return network_disc, requests_disc
+    return network_cont, requests_cont, network_disc, requests_disc
 
 
 
