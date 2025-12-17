@@ -142,7 +142,7 @@ def build_instance_and_paths_city(
         dt=dt,
         t_max=t_max,
         num_modules=num_modules,
-        num_trail=num_trails,   # <-- |P|
+        num_trail=num_trails,   
         Q=Q,
         c_km=c_km,
         c_uns=c_uns,
@@ -923,3 +923,6 @@ def run_heu_prob_model(
     }
 
     return result
+
+
+

@@ -153,10 +153,7 @@ if __name__ == "__main__":
         f"K{num_requests}_"
         f"Nw{num_Nw}.csv"
     )
-    summary_dir = Path("results/CITY/MT/summary")
-    summary_dir.mkdir(parents=True, exist_ok=True)
-
-    summary_path = summary_dir / summary_name
+    summary_path = base_folder / model_name
     df_results.to_csv(summary_path, index=False)
 
     #print(f"\nSummary saved to: {summary_path}")

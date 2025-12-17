@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 from typing import Any, Dict, List, Tuple
 import math
 import numpy as np
@@ -7,9 +6,8 @@ import networkx as nx
 from sklearn.manifold import MDS
 from typing import Literal
 from sklearn.cluster import KMeans
-import random
 import numpy as np
-from pathlib import Path
+
 
 
 def load_original_requests(requests_path: str) -> List[Dict]:

@@ -55,8 +55,8 @@ if __name__ == "__main__":
     model_names = ["w"] 
 
     all_results = []
+    
     exp_id = f"grid_n{number}_h{horizon}_m{num_modules}_r{num_requests}"
-
     print("\n" + "="*80)
     print(f"EXPERIMENT {exp_id}")
     print(f"  number        = {number}")
@@ -103,12 +103,10 @@ if __name__ == "__main__":
     print(f"  full distribution: {dict(sorted(cap_counts.items()))}")
 
 
-    # 2) cartella base per l'esperimento
+    # 2) cartella base per l'esperimento, 
     base_folder = build_output_folder(
         base_dir="results",
         network_path=network_path,
-        t_max=instance.t_max,
-        dt=instance.dt,
     )
     base_folder = base_folder / f"{exp_id}"
     base_folder.mkdir(parents=True, exist_ok=True)
@@ -154,10 +152,8 @@ if __name__ == "__main__":
         f"K{num_requests}_"
         f"Nw{num_Nw}_models.csv"   
     )
-    summary_dir = Path("results/GRID/MT/summary")
-    summary_dir.mkdir(parents=True, exist_ok=True)
 
-    summary_path = summary_dir / summary_name
+    summary_path = base_folder / model_name
     df_results.to_csv(summary_path, index=False)
 
     #print(f"\nSummary saved to: {summary_path}")

@@ -17,23 +17,22 @@ from docplex.mp.model import Model
 def build_output_folder(base_dir: str, network_path: str, t_max: int, dt: int):
     """
     Build a structured folder for logs and results:
-    base_dir/network_name/tmaxXXX_dtYY/
 
     Example:
         base_dir = "results"
-        network_path = "instances/GRID/MT/5x5/network_disc5min.json"
+        network_path = "instances/GRID/5x5/network_disc5min.json"
 
     Result folder:
-        results/GRID/MT/5x5/tmax100_dt5/
+        results/GRID/5x5/
     """
 
     net = Path(network_path)
 
-    # ex.extract GRID/5x5 from path
+    # ex.extract GRID/5x5 from network_path
     network_dir = net.parent.name      # ex."5x5"
     network_group = net.parent.parent.name   # ex."GRID"
 
-    folder = Path(base_dir) / network_group / "MT" / network_dir / f"tmax{t_max*dt}_dt{dt}"
+    folder = Path(base_dir) / network_group / network_dir
     if not folder.exists():
         folder.mkdir(parents=True)
 
@@ -77,6 +76,9 @@ def save_solution_summary(solution, output_folder: Path):
     #print(f"[INFO] Summary saved to: {summary_path}")
 
 
+
+
+
 def save_model_stats(mdl: Model, output_folder: Path):
     """
     Write number of variables, constraints, and other model stats.
@@ -89,7 +91,6 @@ def save_model_stats(mdl: Model, output_folder: Path):
         f.write(f"Integer Vars: {mdl.number_of_integer_variables}\n")
         f.write(f"Constraints: {mdl.number_of_constraints}\n")
     #print(f"[INFO] Model stats saved to: {stats_path}")
-
 
 
 
