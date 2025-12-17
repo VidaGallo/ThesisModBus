@@ -1,8 +1,8 @@
-from utils.MT.loader_fun import *
-from utils.MT.instance_def import *
-from utils.MT.cplex_config import *
-from utils.MT.output_fun import *
-from utils.MT.heuristic_prob_fun import *
+from utils.loader_fun import *
+from utils.instance_def import *
+from utils.cplex_config import *
+from utils.output_fun import *
+from utils.heuristic_prob_fun import *
 from data_generation.generate_data import *
 from models.model_MT_w import *
 

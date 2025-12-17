@@ -763,7 +763,7 @@ def create_MT_model_w(I: Instance):
         - objective
     """
 
-    mdl = Model(name="TaxiLike")
+    mdl = Model(name="Main-Trail")
 
     # 1) variables
     x, y, r, w, s, a, b, D, U, z, kappa,h = create_decision_variables_w(mdl, I)
