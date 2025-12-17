@@ -40,12 +40,11 @@ def compute_shortest_path_time(G: nx.Graph, origin: int, dest: int) -> float:
 
 
 
-
-
-############################################
-#  Generate taxi-like requests (continuous):
-############################################
+###################################
+#  Generate requests (continuous):
+###################################
 def generate_requests(
+    output_path,
     G: nx.Graph,
     num_requests: int,
     q_min: int = 1,
@@ -163,8 +162,12 @@ def generate_requests(
                 })
 
             valid = True
-    return requests
 
+    ### Save requests continuous
+    with output_path.open("w", encoding="utf-8") as f:
+        json.dump(requests, f, indent=2)
+        
+    return 
 
 
 
@@ -192,18 +195,3 @@ def load_network_as_graph(network_path: str) -> nx.DiGraph:
         )
 
     return G
-
-
-
-
-def save_requests(path: str, requests: list) -> None:
-    """
-    Save list of requests (dicts) to JSON.
-    """
-    out_path = Path(path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with out_path.open("w", encoding="utf-8") as f:
-        json.dump(requests, f, indent=2)
-
-    #print(f"[INFO] Saved {len(requests)} requests to: {out_path}")

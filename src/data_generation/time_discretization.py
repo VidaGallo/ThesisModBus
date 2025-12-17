@@ -57,7 +57,7 @@ def interval_to_indices(start_min: float, end_min: float, time_step_min: float):
 
 
 
-def discretize_taxi_requests(
+def discretize_requests(
     input_path: str,
     output_path: str,
     time_step_min: float,
@@ -131,33 +131,3 @@ def discretize_network_travel_times(
         json.dump(net, f, indent=2)
 
     #print(f"[INFO] Discretized network saved to: {out_path}")
-
-
-
-
-### TEST MAIN ###
-if __name__ == "__main__":
-
-    time_step_min = 5.0
-    number = 3      # side of the grid
-    horizon = 60   # in minutes
-
-    # 1) Discretization of the request
-    input_req = f"instances/GRID/{number}x{number}/taxi_like_requests_{horizon}maxmin.json"
-    output_req = f"instances/GRID/{number}x{number}/taxi_like_requests_{horizon}maxmin_disc{int(time_step_min)}min.json"
-
-    discretize_taxi_requests(
-        input_path=input_req,
-        output_path=output_req,
-        time_step_min=time_step_min,
-    )
-
-    # 2) Discretization of the network
-    input_net = f"instances/GRID/{number}x{number}/network.json"
-    output_net = f"instances/GRID/{number}x{number}/network_disc{int(time_step_min)}min.json"
-
-    discretize_network_travel_times(
-        input_path=input_net,
-        output_path=output_net,
-        time_step_min=time_step_min,
-    )

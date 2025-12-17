@@ -1,5 +1,5 @@
 from docplex.mp.model import Model
-from utils.MT.instance_def import Instance
+from utils.instance_def import Instance
 
 
 
@@ -98,7 +98,7 @@ def create_decision_variables_w(mdl: Model, I: Instance):
         name="D"
     )
 
-        # U[m,i,t] = n° TRAIL presi dal MAIN m nel nodo i al tempo t
+    # U[m,i,t] = n° TRAIL presi dal MAIN m nel nodo i al tempo t
     U = mdl.integer_var_dict(
         keys=[(m, i, t)
               for m in M

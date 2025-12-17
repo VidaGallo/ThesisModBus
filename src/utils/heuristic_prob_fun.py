@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 import math
 import numpy as np
 import networkx as nx
@@ -12,6 +12,13 @@ import numpy as np
 from pathlib import Path
 
 
+def load_original_requests(requests_path: str) -> List[Dict]:
+    with open(requests_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def pick_original_by_ids(original_reqs: List[Dict], selected_ids: List[int]) -> List[Dict]:
+    sel = set(int(k) for k in selected_ids)
+    return [r for r in original_reqs if int(r["id"]) in sel]
 
 
 
@@ -59,6 +66,45 @@ def build_requests_4d_from_file(requests_path: str) -> List[Dict]:
     # (opzionale) ordina per k per essere sicuri che indice = k
     req4d.sort(key=lambda x: x["k"])
     return req4d
+
+
+
+Request = Dict[str, Any]
+def build_req6d_from_paths(
+    network_path,
+    requests_path,
+    *,
+    sp_weight: str = "time_min",
+    symmetrize: str = "avg",
+    dim: int = 2,
+) -> Tuple[nx.DiGraph, List[Request], Dict[int, Tuple[float, float]]]:
+    """
+    Carica rete+richieste, crea embedding MDS, costruisce req6d e aggiunge la 7a dimensione 'cap'.
+
+    Returns:
+        G       : grafo nx.DiGraph
+        req6d   : lista richieste con campi 6d + cap
+        node_xy : embedding {node_id: (x,y)}
+    """
+    # loading
+    G = load_network_continuous_as_graph(str(network_path))
+    req4d = build_requests_4d_from_file(str(requests_path))
+
+    # embedding
+    node_xy = mds_embed_nodes_from_sp(
+        G, weight=sp_weight, symmetrize=symmetrize, dim=dim
+    )
+    req6d = build_requests_6d_from_4d(req4d, node_xy)
+
+
+    return G, req6d, node_xy
+
+
+
+
+
+
+
 
 def build_fully_connected_request_6d_matrix(
     req6d: List[Dict],
@@ -122,8 +168,6 @@ def build_fully_connected_request_6d_matrix(
         W[j, i] = dist
 
     return W
-
-
 
 
 
@@ -422,6 +466,9 @@ def iterative_remove_by_centroid(
     return removed_steps, remaining
 
 
+
+
+
 def print_removed_steps(steps: List[Dict], use_capacity: bool = False):
     tag = "7D" if use_capacity else "6D"
     print(f"\n--- Iterative removals ({tag}) ---")
@@ -445,55 +492,47 @@ def print_removed_steps(steps: List[Dict], use_capacity: bool = False):
 
 
 # Per ora k-means, in futuro Bayes
-def make_fictitious_requests_from_remaining(
-    req6d_all: List[Dict],
-    fixed_k: List[int],
+def make_fictitious_requests_from_remaining_list(
+    remaining: List[Dict],
     n_fict: int = 4,
-    use_capacity: bool = True,      # True = 7D clustering, False = 6D
+    use_capacity: bool = True,      # True = 7D (aggiunge q)
+    capacity_key: str = "q",
     standardize: bool = True,
     random_state: int = 23,
-):
+) -> Tuple[List[Dict], List[Dict], np.ndarray]:
     """
-    Crea n_fict richieste fittizie dalle richieste NON fissate.
+    Crea n_fict richieste fittizie usando SOLO 'remaining' (già filtrate).
 
     Return:
-      fict_reqs: lista di dict (6D o 7D) con k fittizio negativo
-      remaining: lista richieste originali usate per creare i fittizi
-      labels: cluster id per ogni remaining
+      fict_reqs: lista dict (6D/7D) con k fittizio negativo
+      remaining: stessa lista remaining (ritornata per comodità)
+      labels: cluster id per ogni elemento di remaining
     """
-    # 1) split fixed vs remaining
-    fixed_set = set(fixed_k)
-    remaining = [r for r in req6d_all if r["k"] not in fixed_set]
     if len(remaining) < n_fict:
         raise ValueError(f"Too few remaining requests ({len(remaining)}) to make {n_fict} fictitious.")
 
-    # 2) build feature matrix X
-    # 6D: [xo,yo,tP,xd,yd,tD]
-    # 7D: add q
     def vec(r):
         base = [r["xo"], r["yo"], r["tP"], r["xd"], r["yd"], r["tD"]]
         if use_capacity:
-            base.append(r["q"])
+            base.append(r[capacity_key])
         return np.array(base, dtype=float)
 
     X = np.vstack([vec(r) for r in remaining])
 
-    # 3) standardize (important!)
+    # standardize
     if standardize:
         mu = X.mean(axis=0)
-        sd = X.std(axis=0)
+        sd = np.std(X, axis=0)
         sd = np.maximum(sd, 1e-8)
         Xn = (X - mu) / sd
     else:
-        mu = np.zeros(X.shape[1], dtype=float)
-        sd = np.ones(X.shape[1], dtype=float)
         Xn = X
 
-    # 4) clustering
+    # clustering
     kmeans = KMeans(n_clusters=n_fict, random_state=random_state, n_init=10)
     labels = kmeans.fit_predict(Xn)
 
-    # 5) build fictitious requests (mean in RAW space, q sum)
+    # build fictitious requests (mean in raw space, capacity sum)
     fict_reqs = []
     for c in range(n_fict):
         idx = np.where(labels == c)[0]
@@ -505,18 +544,14 @@ def make_fictitious_requests_from_remaining(
         xd = float(np.mean([r["xd"] for r in cluster]))
         yd = float(np.mean([r["yd"] for r in cluster]))
         tD = float(np.mean([r["tD"] for r in cluster]))
-
-        if use_capacity:
-            q = int(np.sum([r["q"] for r in cluster]))
-        else:
-            q = int(np.sum([r["q"] for r in cluster]))  # comunque somma capacità totale
+        q  = int(np.sum([r.get(capacity_key, 0) for r in cluster])) if use_capacity else int(np.sum([r.get("q", 0) for r in cluster]))
 
         fict_reqs.append({
-            "k": -(c + 1),      # id fittizi: -1,-2,-3,-4
+            "k": -(c + 1),
             "xo": xo, "yo": yo, "tP": tP,
             "xd": xd, "yd": yd, "tD": tD,
             "q": q,
-            "n_agg": int(len(cluster)),   # quante richieste aggregate
+            "n_agg": int(len(cluster)),
         })
 
     return fict_reqs, remaining, labels
@@ -562,3 +597,121 @@ def snap_fict_request_to_graph_nodes(f: Dict, node_xy: Dict[int, np.ndarray], to
     }
 
 
+
+
+
+def to_demand_generator_format(
+    G: nx.DiGraph,
+    reqs: List[Dict],
+    *,
+    slack_min: float,
+    force_arrival_eq_sp: bool = False,
+):
+    out = []
+
+    for r in reqs:
+        k = int(r["k"])
+        o = int(r["o"])
+        d = int(r["d"])
+        q = int(r["q"])
+        tP = float(r["tP"])
+
+        # shortest path time
+        tau_sp = float(nx.shortest_path_length(G, o, d, weight="time_min"))
+
+        if force_arrival_eq_sp:
+            tD = tP + tau_sp
+        else:
+            tD = float(r["tD"])
+
+        delta = float(slack_min)
+
+        out.append({
+            "id": k,
+            "origin": o,
+            "destination": d,
+            "q_k": q,
+            "desired_departure_min": tP,
+            "desired_arrival_min": tD,
+            "slack_min": delta,
+            "tau_sp_min": tau_sp,
+            "T_k_min":  [tP, tD + delta],
+            "T_in_min": [tP, tP + delta / 2.0],
+            "T_out_min": [tP + tau_sp, tP + tau_sp + delta],
+        })
+
+    return out
+
+
+
+
+
+
+
+
+def fix_constraints(
+    model,
+    var_dicts: Dict[str, Dict[Tuple, Any]],
+    fix_map: Dict[str, Dict[Tuple, float]],
+    *,
+    tol: float = 1e-9,
+    name_prefix: str = "fix",
+) -> int:
+    """
+    model      : docplex.mp.model.Model
+    var_dicts  : {"x": x_vars, "a": a_vars, ...} dove x_vars[(...)] è una Var docplex
+    fix_map    : {"x": {(i,j,t):1, ...}, "a": {...}, ...}
+
+    Aggiunge vincoli var == value.
+    Return: numero vincoli aggiunti.
+    """
+    n_added = 0
+
+    for fam, fixes in fix_map.items():
+        if fam not in var_dicts:
+            raise KeyError(f"fix_map chiede famiglia '{fam}' ma non esiste in var_dicts")
+
+        V = var_dicts[fam]  # dict indicizzato -> Var
+
+        for key, val in fixes.items():
+            if key not in V:
+                raise KeyError(f"Variabile {fam}{key} non trovata nel modello (key={key})")
+
+            v = V[key]
+            value = float(val)
+
+            # evita vincoli inutili se già fissata (opzionale)
+            lb = getattr(v, "lb", None)
+            ub = getattr(v, "ub", None)
+            if lb is not None and ub is not None and abs(lb - value) <= tol and abs(ub - value) <= tol:
+                continue
+
+            ct_name = f"{name_prefix}_{fam}_{'_'.join(map(str, key))}"
+            model.add_constraint(v == value, ctname=ct_name)
+            n_added += 1
+
+    return n_added
+
+
+
+
+
+
+
+
+
+def fix_only_k_families(sol_vals, selected_ids):
+    sel = set(int(k) for k in selected_ids)
+    out = {}
+
+    # famiglie dove la key inizia con k
+    k_first_fams = {"r", "w", "a", "b"}
+    for fam in k_first_fams:
+        if fam in sol_vals:
+            out[fam] = {key: val for key, val in sol_vals[fam].items() if int(key[0]) in sel}
+
+    # s ha key = k
+    if "s" in sol_vals:
+        out["s"] = {k: val for k, val in sol_vals["s"].items() if int(k) in sel}
+
+    return out

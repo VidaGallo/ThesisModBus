@@ -10,6 +10,7 @@ import time
 
 
 import random
+from math import inf
 import numpy as np
 import pandas as pd
 
@@ -539,6 +540,119 @@ def run_single_model_city(
 
 
 
+
+
+
+
+def mini_routing(
+    mini_requests_path: str | Path,
+    network_path: str | Path,
+    old_constraints_dict: Dict[str, Dict[tuple, float]],
+    *,
+    # --- instance/build params (pass explicitly, no globals) ---
+    dt: int,
+    t_max: int,
+    num_modules: int,
+    num_trails: int,
+    Q: int,
+    c_km: float,
+    c_uns: float,
+    depot: int,
+    num_Nw: int,
+    z_max: int,
+    # --- run/config params ---
+    base_output_folder: str | Path,
+    model_name: str = "w",
+    cplex_cfg: dict | None = None,
+) -> Tuple[Any, Any]:
+    """
+    Build a mini instance from (network_path, mini_requests_path), create model,
+    apply fix-and-optimize constraints from old_constraints_dict, configure cplex.
+    Returns (model, instance).
+    """
+
+    mini_requests_path = Path(mini_requests_path)
+    network_path = Path(network_path)
+    base_output_folder = Path(base_output_folder)
+
+    # ----------------
+    # Load instance
+    # ----------------
+    instance = load_instance_discrete(
+        network_path=str(network_path),
+        requests_path=str(mini_requests_path),
+        dt=dt,
+        t_max=t_max,
+        num_modules=num_modules,
+        num_trail=num_trails,  
+        Q=Q,
+        c_km=c_km,
+        c_uns=c_uns,
+        depot=depot,
+        num_Nw=num_Nw,
+        z_max=z_max,
+    )
+
+    # ----------------
+    # Output folder
+    # ----------------
+    output_folder = base_output_folder / model_name
+    output_folder.mkdir(parents=True, exist_ok=True)
+
+    # ----------------
+    # Build model
+    # ----------------
+    t_start_total = time.perf_counter()
+
+    if model_name == "w":
+        model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_w(instance)
+
+        # IMPORTANT: include here only actual docplex Var dicts
+        var_dicts = {
+            "x": x, "y": y,
+            "r": r, "w": w, "s": s,
+            "a": a, "b": b,
+            "D": D, "U": U,
+            "z": z, "kappa": kappa,
+            "h": h,
+        }
+    else:
+        raise ValueError(f"Unknown model_name: {model_name}")
+
+    # -----------------
+    # Configure solver
+    # -----------------
+    configure_cplex(model, cplex_cfg)
+
+    # --------------------------
+    # Apply previous constraints
+    # --------------------------
+    if old_constraints_dict:
+        nfix = fix_constraints(model, var_dicts, old_constraints_dict)
+        print("added fix constraints:", nfix)
+
+    sol = model.solve(log_output=False)
+    if sol is None:
+        raise RuntimeError("mini_routing: infeasible or no solution found")
+    
+    # ----------------
+    # Build NEW fix constraints only for selected_ids and only k-families
+    # ----------------
+    sol_vals = extract_solution_values(var_dicts, sol)
+    new_fix = fix_only_k_families(sol_vals, selected_ids)
+
+    # merge into old fixmap (deep)
+    updated_fixmap = deep_merge_fixmaps(dict(old_constraints_dict), new_fix)
+
+    elapsed = time.perf_counter() - t_start_total
+    # print(f"mini_routing total time: {elapsed:.3f}s")
+
+    return model, instance, updated_fixmap, sol
+
+
+
+
+
 # ======================================================================
 #  RUN HEURISTIC PROB MODEL - GRID
 # ======================================================================
@@ -560,120 +674,112 @@ def run_heu_prob_model(
     rel_std: float,
     base_output_folder,   
     cplex_cfg: dict | None = None,
-
+    keep: int = 4,
+    fict: int = 3,
+    it_out: int = 100,
+    it_in: int = 50,
+    time_out: float = 36_000,
+    tol:float = 0.1
 ) -> dict:
     """
     Euristica basata su sentizzazione per prob. su una stessa Instance (GRID).
     """
-    request_ids = list(instance.K)
 
-    paths = {
-        "root": output_folder,
-        "heur": output_folder / "heuristic",
-        "summary": output_folder / "summary",
-    }
-    while request_ids:    # request_ids.pop(...)
 
-        # loading
-        G = load_network_continuous_as_graph(str(network_path))
-        req4d = build_requests_4d_from_file(str(requests_path))
+    original_reqs = load_original_requests(str(requests_path))
+    original_ids = [r["id"] for r in original_reqs]
 
-        # embedding
-        node_xy = mds_embed_nodes_from_sp(G, weight="time_min", symmetrize="avg", dim=2)
-        req6d = build_requests_6d_from_4d(req4d, node_xy)
 
-        # 7th dimension
-        req7d = []
-        for r in req6d:
-            rr = dict(r)                  # copia
-            rr["cap"] = rr.get("q", 0)    # oppure rr["cap"] = rr["q"]
-            req7d.append(rr)
-
-        KEEP = 4
-        FICT = 5
-
-        steps7, remaining7 = iterative_remove_by_centroid(
+    G, req6d, node_xy = build_req6d_from_paths(
+        network_path=network_path,      
+        requests_path=requests_path,  
+    )
+    
+    original_ids_old = original_ids.copy()
+    original_ids_new = original_ids.copy()
+    start_time = time.time()
+    i = 0
+    while (
+          (i <= it_out) and 
+          (time.time() - start_time < time_out) and 
+          (len(original_ids_new) >= keep) and 
+          original_ids_old != original_ids_new     
+    ):
+        selected_log, remaining_req = iterative_remove_by_centroid(
             req6d,
-            n_remove=KEEP,
-            use_capacity=True,
+            n_remove=keep,
+            use_capacity=True,     # use 7th dim
             capacity_key="q",
             standardize=True,
             mode="closest",
         )
+        original_ids_old = original_ids_new
 
-        fixed_k = [s["removed_k"] for s in steps7]
+        selected_ids = [s["removed_k"] for s in selected_log] 
+        selected_full = pick_original_by_ids(original_reqs, selected_ids)   # Selection from the original ones
 
-        fict6d, _, _ = make_fictitious_requests_from_remaining(
-            req6d_all=req6d,
-            fixed_k=fixed_k,
-            n_fict=FICT,
-            use_capacity=True,
-            standardize=True,
-            random_state=seed,
-        )
+        j = 0
+        f_obj_approx_old = inf
+        f_obj_approx_new = inf
 
-        fict_graph = [snap_fict_request_to_graph_nodes(f, node_xy) for f in fict6d]
+        while (j < it_in) and (abs(f_obj_approx_old - f_obj_approx_new)) >= tol:
+            f_obj_approx_old = f_obj_approx_new
 
-        fixed_real = [r for r in req4d if r["k"] in set(fixed_k)]
+            # Will be a GP in the future
+            ##### QUIIIII PUPOOOOO """"
+            fictitious_req, _, _ = make_fictitious_requests_from_remaining_list(
+                remaining=remaining_req,
+                n_fict=fict,
+                use_capacity=True,
+                capacity_key="q",
+                standardize=True,
+                random_state=seed,
+            )
 
-        fict_4d = [{
-            "k": f["k"],
-            "o": f["o"],
-            "tP": f["tP"],
-            "d": f["d"],
-            "tD": f["tD"],
-            "q": f["q"],
-        } for f in fict_graph]
+            #### FUNZIONE DA FARE ESTERNA ##################################################
+            # Projection onto the original space graph
+            fict_graph = [snap_fict_request_to_graph_nodes(f, node_xy) for f in fictitious_req]
+            
+            # Conversion to the original 2D format
+            fict_full = to_demand_generator_format(
+                G,
+                fict_graph,
+                slack_min=slack_min,
+                force_arrival_eq_sp=False,  # oppure True se vuoi tD=tP+tau_sp
+            )
 
-        final_requests = fixed_real + fict_4d
-
-        out_path = paths["heur"] / "requests_REDUCED.json"
-        out_json = [{
-            "id": int(r["k"]),
-            "origin": int(r["o"]),
-            "destination": int(r["d"]),
-            "q_k": int(r["q"]),
-            "desired_departure_min": float(r["tP"]),
-            "desired_arrival_min": float(r["tD"]),
-        } for r in final_requests]
-
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(out_json, f, indent=2)
-
-        df_heur = pd.DataFrame([{
-            "exp_id": exp_id,
-            "seed": seed,
-            "K_original": len(req4d),
-            "K_reduced": len(final_requests),
-            "KEEP": KEEP,
-            "FICT": FICT,
-            "fixed_k": fixed_k,
-        }])
-
-        df_heur.to_csv(paths["summary"] / "summary_heuristic.csv", index=False)
+            # Merge finale
+            final_requests = selected_full + fict_full
+            ############################################################################À
 
 
-
-    # Sottocartella specifica per questo modello
-    output_folder = base_output_folder / model_name
-    if not output_folder.exists():
-        output_folder.mkdir(parents=True)
-
-    # ----------------
-    # Costruzione modello
-    # ----------------
-    t_start_total = time.perf_counter()
-
-    x = y = r = w = L = R = s = a = b = h = None
-    D = U = z = kappa = None   # variabili TRAIL per i modelli con platoon
-
-    if  model_name == "w":
-        model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_w(instance)
-    else:
-        raise ValueError(f"Unknown model_name: {model_name}")
+            # -----------------
+            # MINI ROUTING
+            # -----------------
+            
+            dict_of_fixed_variables
+            ...
+            original_ids_new.pop() di quelle che sono state soddsfatte
 
 
-    configure_cplex(model, cplex_cfg)
+            # -----------------
+            # EVALUATE MINIRUTING (relaxed)
+            # -----------------
+            ....
+            mdl_lp = mdl.relax()
+            sol_lp = mdl_lp.solve()
+            f_obj_approx_new=....
+
+
+            j += 1
+
+
+
+
+        i += 1  # i++
+        original_ids.pop("qualcosa") # <---
+
+
 
     # ----------------
     # Solve

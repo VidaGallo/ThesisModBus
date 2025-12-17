@@ -29,7 +29,6 @@ def set_seed(seed: int) -> random.Random:
     if seed is None:
         raise ValueError(
             "seed=None is not allowed. "
-            "For reproducible experiments, seed must be an integer."
         )
 
     random.seed(seed)
@@ -69,7 +68,6 @@ def generate_all_data(
         / "GRID"
         / f"{number}x{number}"
         / f"seed{seed}_K{num_requests}_sl{slack_min}_dt{dt}"
-        / f"len{mean_edge_length_km}_v{mean_speed_kmh}"
     )
     base.mkdir(parents=True, exist_ok=True)
 
@@ -79,19 +77,20 @@ def generate_all_data(
     requests_disc = base / f"requests_disc{dt}min.json"
 
 
-    ### GENERATE CONTINUOUS NETWORK
-    network = generate_grid_network(
+    ### GENERATE CONTINUOUS NETWORK + SAVING
+    generate_grid_network(
+        output_path=network_cont, 
         side=number,
         edge_length_km=mean_edge_length_km,
-        speed_kmh=mean_speed_kmh
+        speed_kmh=mean_speed_kmh,
     )
-    save_network_json(network, base, filename="network.json")
 
 
-    ### GENERATE CONTINUOUS REQUESTS
+    ### GENERATE CONTINUOUS REQUESTS + SAVING
     G = load_network_as_graph(network_cont)
 
-    taxi_requests = generate_requests(
+    generate_requests(
+        output_path=requests_cont,
         G=G,
         num_requests=num_requests,
         q_min=q_min,
@@ -103,27 +102,22 @@ def generate_all_data(
         rng=rng
     )
 
-    save_requests(requests_cont, taxi_requests)
-
-
-
-    ### DISCRETIZE REQUESTS & NETWORK
-    discretize_taxi_requests(
+    ### DISCRETIZE REQUESTS + SAVING
+    discretize_requests(
         input_path=requests_cont,
         output_path=requests_disc,
         time_step_min=float(dt),
     )
 
+
+    ### DISCRETIZE NETWORK + SAVING
     discretize_network_travel_times(
         input_path=network_cont,
         output_path=network_disc,
         time_step_min=float(dt),
     )
 
-    #print("\n[DATA GENERATION COMPLETE]")
-    #print("Continuous and discrete data created in:", base)
-
-    # RETURN PATHS FOR THE MAIN
+    # Return paths
     return network_disc, requests_disc
 
 
@@ -160,7 +154,6 @@ def generate_all_data_asym(
         / "GRID_ASYM"
         / f"{number}x{number}"
         / f"seed{seed}_K{num_requests}_sl{slack_min}_dt{dt}"
-        / f"len{mean_edge_length_km}_v{mean_speed_kmh}_std{rel_std}"
     )
     base.mkdir(parents=True, exist_ok=True)
 
@@ -170,8 +163,9 @@ def generate_all_data_asym(
     requests_disc = base / f"requests_disc{dt}min.json"
 
 
-    ### GENERATE CONTINUOUS NETWORK
-    network = generate_grid_network_asym(
+    ### GENERATE CONTINUOUS NETWORK + SAVING
+    generate_grid_network_asym(
+        output_path=network_cont,
         side=number,
         edge_length_km=mean_edge_length_km,
         speed_kmh=mean_speed_kmh,
@@ -179,13 +173,13 @@ def generate_all_data_asym(
         rng = rng
 
     )
-    save_network_json(network, base, filename="network.json")
 
 
-    ### GENERATE CONTINUOUS REQUESTS
+    ### GENERATE CONTINUOUS REQUESTS + SAVING
     G = load_network_as_graph(network_cont)
 
-    taxi_requests = generate_requests(
+    generate_requests(
+        output_path=requests_cont,
         G=G,
         num_requests=num_requests,
         q_min=q_min,
@@ -197,29 +191,24 @@ def generate_all_data_asym(
         rng=rng
     )
 
-    save_requests(requests_cont, taxi_requests)
 
 
-
-    ### DISCRETIZE REQUESTS & NETWORK
-    discretize_taxi_requests(
+    ### DISCRETIZE REQUESTS  + SAVING
+    discretize_requests(
         input_path=requests_cont,
         output_path=requests_disc,
         time_step_min=float(dt),
     )
 
+    ### DISCRETIZE NETWORK  + SAVING
     discretize_network_travel_times(
         input_path=network_cont,
         output_path=network_disc,
         time_step_min=float(dt),
     )
 
-    #print("\n[DATA GENERATION COMPLETE]")
-    #print("Continuous and discrete data created in:", base)
 
-
-
-    # RETURN PATHS FOR THE MAIN
+    # Return paths
     return network_disc, requests_disc
 
 
@@ -276,19 +265,20 @@ def generate_all_data_city(
     requests_disc = base / f"requests_disc{dt}min.json"
 
 
-    ### GENERATE CONTINUOUS NETWORK
-    network = generate_grid_network_city(
+    ### GENERATE CONTINUOUS NETWORK + SAVING
+    generate_grid_network_city(
+        output_path=network_cont,
         place = city,
         central_suburbs = central_suburbs,
         speed_kmh = mean_speed_kmh
     )
-    save_network_json(network, base, filename="network.json")
 
 
-    ### GENERATE CONTINUOUS REQUESTS
+    ### GENERATE CONTINUOUS REQUESTS + SAVING
     G = load_network_as_graph(network_cont)
 
-    taxi_requests = generate_requests(
+    generate_requests(
+        output_path=requests_cont,
         G=G,
         num_requests=num_requests,
         q_min=q_min,
@@ -300,12 +290,9 @@ def generate_all_data_city(
         rng=rng
     )
 
-    save_requests(requests_cont, taxi_requests)
 
-
-
-    ### DISCRETIZE REQUESTS & NETWORK
-    discretize_taxi_requests(
+    ### DISCRETIZE REQUESTS & NETWORK + SAVING
+    discretize_requests(
         input_path=requests_cont,
         output_path=requests_disc,
         time_step_min=float(dt),
@@ -317,12 +304,7 @@ def generate_all_data_city(
         time_step_min=float(dt),
     )
 
-    #print("\n[DATA GENERATION COMPLETE]")
-    #print("Continuous and discrete data created in:", base)
-
-
-
-    # RETURN PATHS FOR THE MAIN
+    # Return paths
     return network_disc, requests_disc
 
 

@@ -30,22 +30,6 @@ import geopandas as gpd
 
 
 
-def save_network_json(network_dict: dict, output_dir: str, filename: str = "network.json") -> None:
-    """
-    Save a network dictionary to a JSON file.
-    """
-    out_dir = Path(output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    out_path = out_dir / filename
-
-    with out_path.open("w", encoding="utf-8") as f:
-        json.dump(network_dict, f, indent=2)
-
-    #print(f"[INFO] Saved network to: {out_path}")
-
-
-
 
 
 #################
@@ -53,6 +37,7 @@ def save_network_json(network_dict: dict, output_dir: str, filename: str = "netw
 #################
 
 def generate_grid_network(
+    output_path,
     side: int,
     edge_length_km: float = 1.0,
     speed_kmh: float = 40.0,
@@ -123,11 +108,17 @@ def generate_grid_network(
         "edges": edges,
         "speed_kmh": float(speed_kmh),
     }
-    return network_dict
+
+    ### Save network continuous
+    with output_path.open("w", encoding="utf-8") as f:
+        json.dump(network_dict, f, indent=2)
+
+    return
 
 
 
 def generate_grid_network_asym(
+    output_path,
     side: int,
     edge_length_km: float = 1.0,
     speed_kmh: float = 40.0,
@@ -208,7 +199,12 @@ def generate_grid_network_asym(
         "base_edge_length_km": float(edge_length_km),
         "rel_std": float(rel_std),
     }
-    return network_dict
+
+    ### Save network continuous
+    with output_path.open("w", encoding="utf-8") as f:
+        json.dump(network_dict, f, indent=2)
+
+    return
 
 
 
@@ -863,6 +859,7 @@ def make_network_directed(network_dict: dict) -> dict:
 
 
 def generate_grid_network_city(
+    output_path,
     place: str = "Torino, Italia",
     central_suburbs: list[str] = ["Centro", "Crocetta", "Santa Rita", "Aurora"],
     speed_kmh: float = 40.0
@@ -954,6 +951,11 @@ def generate_grid_network_city(
         "edges": edges,          
         "speed_kmh": float(speed_kmh),
     }
+    
+    ### Save network continuous
+    with output_path.open("w", encoding="utf-8") as f:
+        json.dump(network_dict, f, indent=2)
+
     return network_dict
 
 
