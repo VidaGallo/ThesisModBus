@@ -1,7 +1,7 @@
-from utils.MT.heuristic_fun import *
+from utils.MT.heuristic_prob_fun import *
 from utils.MT.runs_fun import *
 
-import json
+
 import random
 import numpy as np
 import pandas as pd
@@ -27,48 +27,48 @@ CPLEX_CFG = {
     "threads": 0,             # 0 = all available threads
     "mip_display": 1,         # 0..5 (2 = default)
     "emphasis_mip": 2,        # 0 balanced, 1 feasibility, 2 optimality, ...
-    "parallel": 2             # 0 auto, 1 opportunistic, 2 deterministic
+    "parallel": 0             # 0 auto, 1 opportunistic, 2 deterministic
 }
 
 
 if __name__ == "__main__":
 
     # =========================
-    # SEED
+    # EXPERIMENT PARAMS
     # =========================
+
+    ### SEED 
     seed = 23
     set_seed(seed)
 
-    # =========================
-    # BASE PARAMS
-    # =========================
-    horizon = 108
-    dt = 6
-    depot = 0
-
-    Q = 10
+    ### GRID (ASYM) PARAMS
+    number = 2
     mean_speed_kmh = 40.0
     mean_edge_length_km = 3.33
     rel_std = 0.66
-    c_km = 1.0
-    c_uns = 100.0
-
-    num_Nw = 2
+    num_Nw = 2     
+    depot = 0      
+    
+    ### REQUEST PARAMS
+    num_requests = 3        
     q_min, q_max = 1, 10
     alpha = 0.65
-    slack_min = 20.0
+    slack_min = 20.0         
 
-    # =========================
-    # GRID PARAMS
-    # =========================
-    number = 2
+    ### TIME PARAMS
+    horizon = 108         
+    dt = 6
+    
+    ### MODULE PARAMS
+    Q = 10
+    c_km = 1.0
+    c_uns = 100.0
     num_modules = 2
     num_trails = 6
     z_max = 3
-    num_requests = 30
 
-    model_name = "w"   # <<< MODEL FISSO
-
+    ### MODEL & EXPERIMENT NAME
+    model_name = "w"  
     exp_id = (
         f"GRID_n{number}_H{horizon}_dt{dt}_"
         f"M{num_modules}_P{num_trails}_Z{z_max}_"
@@ -79,19 +79,19 @@ if __name__ == "__main__":
     print(f"EXPERIMENT {exp_id}")
     print("=" * 80)
 
-    # =========================
-    # OUTPUT FOLDERS
-    # =========================
+    ### OUTPUT FOLDERS
     base = Path("results") / "GRID" / "MT" / exp_id
     paths = {
         "base": base,
-        "exact": base / "01_exact",
-        "heur": base / "02_heuristic",
+        "exact": base / "exact",
+        "heur": base / "heuristic_prob",
         "summary": base / "summary",
         "plots": base / "plots",
     }
     for p in paths.values():
         p.mkdir(parents=True, exist_ok=True)
+
+
 
     # =========================
     # BUILD INSTANCE (ONCE)
@@ -123,6 +123,9 @@ if __name__ == "__main__":
     print(" network :", network_path)
     print(" requests:", requests_path)
 
+
+
+
     # =========================
     # EXACT (CPLEX)
     # =========================
@@ -150,7 +153,7 @@ if __name__ == "__main__":
             mean_speed_kmh=mean_speed_kmh,
             rel_std=rel_std,
             base_output_folder=paths["exact"],
-            cplex_cfg=CPLEX_CFG      # possibe early stopping/feasable but not optimal
+            cplex_cfg=CPLEX_CFG      # possibility of early stopping/feasable but not optimal
         )
 
         exact_results.append(res)
@@ -160,6 +163,11 @@ if __name__ == "__main__":
     else:
         print("\n[SKIP] EXACT disabled")
 
+
+
+
+
+
     # =========================
     # HEURISTIC
     # =========================
@@ -168,75 +176,7 @@ if __name__ == "__main__":
         print("RUNNING HEURISTIC")
         print("=" * 80)
 
-        # usa ESATTAMENTE gli stessi dati
-        G = load_network_continuous_as_graph(str(network_path))
-        req4d = build_requests_4d_from_file(str(requests_path))
 
-        node_xy = mds_embed_nodes_from_sp(G, weight="time_min", symmetrize="avg", dim=2)
-        req6d = build_requests_6d_from_4d(req4d, node_xy)
-
-        KEEP = 4
-        FICT = 5
-
-        steps7, remaining7 = iterative_remove_by_centroid(
-            req6d,
-            n_remove=KEEP,
-            use_capacity=True,
-            capacity_key="q",
-            standardize=True,
-            mode="closest",
-        )
-
-        fixed_k = [s["removed_k"] for s in steps7]
-
-        fict6d, _, _ = make_fictitious_requests_from_remaining(
-            req6d_all=req6d,
-            fixed_k=fixed_k,
-            n_fict=FICT,
-            use_capacity=True,
-            standardize=True,
-            random_state=seed,
-        )
-
-        fict_graph = [snap_fict_request_to_graph_nodes(f, node_xy) for f in fict6d]
-
-        fixed_real = [r for r in req4d if r["k"] in set(fixed_k)]
-
-        fict_4d = [{
-            "k": f["k"],
-            "o": f["o"],
-            "tP": f["tP"],
-            "d": f["d"],
-            "tD": f["tD"],
-            "q": f["q"],
-        } for f in fict_graph]
-
-        final_requests = fixed_real + fict_4d
-
-        out_path = paths["heur"] / "requests_REDUCED.json"
-        out_json = [{
-            "id": int(r["k"]),
-            "origin": int(r["o"]),
-            "destination": int(r["d"]),
-            "q_k": int(r["q"]),
-            "desired_departure_min": float(r["tP"]),
-            "desired_arrival_min": float(r["tD"]),
-        } for r in final_requests]
-
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(out_json, f, indent=2)
-
-        df_heur = pd.DataFrame([{
-            "exp_id": exp_id,
-            "seed": seed,
-            "K_original": len(req4d),
-            "K_reduced": len(final_requests),
-            "KEEP": KEEP,
-            "FICT": FICT,
-            "fixed_k": fixed_k,
-        }])
-
-        df_heur.to_csv(paths["summary"] / "summary_heuristic.csv", index=False)
 
     else:
         print("\n[SKIP] HEURISTIC disabled")

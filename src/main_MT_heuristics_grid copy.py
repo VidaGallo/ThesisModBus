@@ -1,4 +1,4 @@
-from utils.MT.heuristic_fun import *
+from utils.MT.heuristic_prob_fun import *
 from utils.MT.runs_fun import *
 
 

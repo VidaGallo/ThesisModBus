@@ -13,7 +13,7 @@ CPLEX_CFG = {
     "threads": 0,             # 0 = all available threads
     "mip_display": 1,         # 0..5 (2 = default)
     "emphasis_mip": 2,        # 0 balanced, 1 feasibility, 2 optimality, ...
-    "parallel": 2             # 0 auto, 1 opportunistic, 2 deterministic
+    "parallel": 0             # 0 auto, 1 opportunistic, 2 deterministic
 }
 
 
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     num_modules   = 2
     num_trails    = 6
     z_max         = 3      # max trail per main
-    num_requests  = 30
+    num_requests  = 3
     
 
     # Nomi dei modelli da eseguire

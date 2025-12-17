@@ -124,7 +124,6 @@ def load_instance_discrete(
     Q: int,
     c_km: float,
     c_uns: float,
-    g_plat: float,
     depot: int,
     num_Nw: int,
     z_max: int | None = None
@@ -144,7 +143,6 @@ def load_instance_discrete(
     Q : int              # module capacity
     c_km : float         # cost per km
     c_uns : float        # unserved demand penalty
-    g_plat : float       # reward for platooning
     depot : int          # depot node
     num_Nw : int         # number of internal nodes where swaps are allowed
     """
@@ -178,7 +176,6 @@ def load_instance_discrete(
         Q=Q,
         c_km=c_km,
         c_uns=c_uns,
-        g_plat=g_plat,
         gamma=gamma,
         tau_arc=tau_arc,
         q=q,

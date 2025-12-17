@@ -2,11 +2,12 @@ from utils.MT.loader_fun import *
 from utils.MT.instance_def import *
 from utils.MT.cplex_config import *
 from utils.MT.output_fun import *
+from utils.MT.heuristic_prob_fun import *
 from data_generation.generate_data import *
+from models.model_MT_w import *
 
 import time
 
-from models.deterministic.model_MT_w import *
 
 import random
 import numpy as np
@@ -86,7 +87,6 @@ def build_instance_and_paths(
 
 
 
-
 # ======================================================================
 #  BUILD INSTANCE - CITY
 # ======================================================================
@@ -151,7 +151,6 @@ def build_instance_and_paths_city(
     )
 
     return instance, network_path, requests_path, t_max
-
 
 
 
@@ -348,10 +347,11 @@ def run_single_model(
     return result
 
 
+
+
 # ======================================================================
 #  RUN SINGLE MODEL - CITY
 # ======================================================================
-
 def run_single_model_city(
     city: str,
     instance: Instance,
@@ -538,3 +538,282 @@ def run_single_model_city(
 
 
 
+
+# ======================================================================
+#  RUN HEURISTIC PROB MODEL - GRID
+# ======================================================================
+def run_heu_prob_model(
+    instance: Instance,
+    model_name: str,
+    network_path,            ### full name!
+    requests_path,           ### full name!
+    number: int,
+    horizon: int,
+    q_min: int,
+    q_max: int,
+    alpha: float,
+    slack_min: float,
+    seed: int,
+    exp_id: str,
+    mean_edge_length_km: float,
+    mean_speed_kmh: float,
+    rel_std: float,
+    base_output_folder,   
+    cplex_cfg: dict | None = None,
+
+) -> dict:
+    """
+    Euristica basata su sentizzazione per prob. su una stessa Instance (GRID).
+    """
+    request_ids = list(instance.K)
+
+    paths = {
+        "root": output_folder,
+        "heur": output_folder / "heuristic",
+        "summary": output_folder / "summary",
+    }
+    while request_ids:    # request_ids.pop(...)
+
+        # loading
+        G = load_network_continuous_as_graph(str(network_path))
+        req4d = build_requests_4d_from_file(str(requests_path))
+
+        # embedding
+        node_xy = mds_embed_nodes_from_sp(G, weight="time_min", symmetrize="avg", dim=2)
+        req6d = build_requests_6d_from_4d(req4d, node_xy)
+
+        # 7th dimension
+        req7d = []
+        for r in req6d:
+            rr = dict(r)                  # copia
+            rr["cap"] = rr.get("q", 0)    # oppure rr["cap"] = rr["q"]
+            req7d.append(rr)
+
+        KEEP = 4
+        FICT = 5
+
+        steps7, remaining7 = iterative_remove_by_centroid(
+            req6d,
+            n_remove=KEEP,
+            use_capacity=True,
+            capacity_key="q",
+            standardize=True,
+            mode="closest",
+        )
+
+        fixed_k = [s["removed_k"] for s in steps7]
+
+        fict6d, _, _ = make_fictitious_requests_from_remaining(
+            req6d_all=req6d,
+            fixed_k=fixed_k,
+            n_fict=FICT,
+            use_capacity=True,
+            standardize=True,
+            random_state=seed,
+        )
+
+        fict_graph = [snap_fict_request_to_graph_nodes(f, node_xy) for f in fict6d]
+
+        fixed_real = [r for r in req4d if r["k"] in set(fixed_k)]
+
+        fict_4d = [{
+            "k": f["k"],
+            "o": f["o"],
+            "tP": f["tP"],
+            "d": f["d"],
+            "tD": f["tD"],
+            "q": f["q"],
+        } for f in fict_graph]
+
+        final_requests = fixed_real + fict_4d
+
+        out_path = paths["heur"] / "requests_REDUCED.json"
+        out_json = [{
+            "id": int(r["k"]),
+            "origin": int(r["o"]),
+            "destination": int(r["d"]),
+            "q_k": int(r["q"]),
+            "desired_departure_min": float(r["tP"]),
+            "desired_arrival_min": float(r["tD"]),
+        } for r in final_requests]
+
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(out_json, f, indent=2)
+
+        df_heur = pd.DataFrame([{
+            "exp_id": exp_id,
+            "seed": seed,
+            "K_original": len(req4d),
+            "K_reduced": len(final_requests),
+            "KEEP": KEEP,
+            "FICT": FICT,
+            "fixed_k": fixed_k,
+        }])
+
+        df_heur.to_csv(paths["summary"] / "summary_heuristic.csv", index=False)
+
+
+
+    # Sottocartella specifica per questo modello
+    output_folder = base_output_folder / model_name
+    if not output_folder.exists():
+        output_folder.mkdir(parents=True)
+
+    # ----------------
+    # Costruzione modello
+    # ----------------
+    t_start_total = time.perf_counter()
+
+    x = y = r = w = L = R = s = a = b = h = None
+    D = U = z = kappa = None   # variabili TRAIL per i modelli con platoon
+
+    if  model_name == "w":
+        model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_w(instance)
+    else:
+        raise ValueError(f"Unknown model_name: {model_name}")
+
+
+    configure_cplex(model, cplex_cfg)
+
+    # ----------------
+    # Solve
+    # ----------------
+    t_start_solve = time.perf_counter()
+    solution = model.solve(log_output=False)
+    solve_time = time.perf_counter() - t_start_solve
+    total_time = time.perf_counter() - t_start_total
+
+    if solution:
+        print(f"[EXP {exp_id} | model={model_name}] Status: {solution.solve_status}")
+        print("Objective:", solution.objective_value)
+    else:
+        print(f"[EXP {exp_id} | model={model_name}] No solution found.")
+    print("Solve time (sec):", solve_time)
+    print("Total time (sec):", total_time)
+    print("-" * 77)
+    print(output_folder)
+
+    # ----------------
+    # Salvataggi
+    # ----------------
+    save_model_stats(model, output_folder)
+    save_cplex_log(model, output_folder)
+
+    if solution is not None:
+        save_solution_summary(solution, output_folder)
+        try:
+            save_solution_variables_flex(
+                solution=solution,
+                output_folder=output_folder,
+                x=x,
+                y=y,
+                r=r,
+                w=w,
+                s=s,
+                L=L,
+                R=R,
+                a=a,
+                b=b,
+                h=h,
+                D=D,
+                U=U,
+                z_main=z,    # z[m,t] numero TRAIL attaccati
+                kappa=kappa, # κ[i,t] TRAIL parcheggiati
+            )
+        except TypeError:
+            # per compatibilità con vecchie versioni
+            pass
+
+    # ----------------
+    # Served summary
+    # ----------------
+    if solution is not None:
+        served_requests = []
+        for k in instance.K:
+            val = solution.get_value(s[k])
+            if val is not None and val > 0.5:
+                served_requests.append(k)
+
+        served = len(served_requests)
+        total = len(instance.K)
+        served_ratio = served / total if total > 0 else 0.0
+    else:
+        served_requests = []
+        served = 0
+        total = len(instance.K)
+        served_ratio = 0.0
+
+    print(f"[{model_name}] -> served: {served}/{total}  ({served_ratio*100:.1f}%)")
+    print(f"[{model_name}] -> richieste servite (k): {served_requests}")
+
+    # ----------------
+    # Info solver
+    # ----------------
+    if solution is not None:
+        status = str(solution.solve_status)
+        objective = solution.objective_value
+        try:
+            mip_gap = model.solve_details.mip_relative_gap
+        except Exception:
+            mip_gap = None
+    else:
+        status = "NoSolution"
+        objective = None
+        mip_gap = None
+
+    # ----------------
+    # Dizionario risultato
+    # ----------------
+    result = {
+        # identificazione esperimento + modello
+        "exp_id": exp_id,
+        "model_name": model_name,
+        "num_Nw": instance.num_Nw,
+
+        # --- experiment data ---
+        "seed": seed,
+        "number": number,
+        "grid_nodes": number * number,
+        "mean_edge_length": mean_edge_length_km,
+        "mean_speed": mean_speed_kmh,
+        "std": rel_std,
+        "horizon": horizon,
+        "dt": instance.dt,
+        "t_max": instance.t_max,
+        "num_modules": instance.num_modules,
+        "num_trails": instance.num_trail_modules,
+        "z_max": instance.Z_max,
+        "Q": instance.Q,
+        "c_km": instance.c_km,
+        "c_uns": instance.c_uns,
+        "num_requests": instance.num_requests,
+        "served": served,
+        "served_ratio": served_ratio,
+        "q_min": q_min,
+        "q_max": q_max,
+        "alpha": alpha,
+        "slack_min": slack_min,
+        "depot": instance.depot,
+
+
+        # --- instance sizes ---
+        "N_size": len(instance.N),
+        "A_size": len(instance.A),
+        "K_size": len(instance.K),
+        "M_size": len(instance.M),
+        "P_size": len(instance.P),
+
+        # --- solver output ---
+        "status": status,
+        "objective": objective,
+        "mip_gap": mip_gap,
+        "solve_time_sec": solve_time,
+        "total_time_sec": total_time,
+
+        # --- paths ---
+        "output_folder": str(output_folder),
+        "network_path": str(network_path),
+        "requests_path": str(requests_path),
+    }
+
+    return result
