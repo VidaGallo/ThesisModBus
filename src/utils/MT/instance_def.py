@@ -68,7 +68,7 @@ class Instance:
 
 
     ### --- depot ---
-    depot: int = 0
+    depot: int = 0     # # <-- To choose, possibility of using LIST
 
     ### --- internal nodes ---
     num_Nw: int = 0                   # <-- To choose

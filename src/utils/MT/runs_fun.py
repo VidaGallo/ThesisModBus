@@ -166,34 +166,22 @@ def run_single_model(
     requests_path,
     number: int,
     horizon: int,
-
     q_min: int,
     q_max: int,
+    alpha: float,
     slack_min: float,
-    depot: int,
     seed: int,
-    exp_id: int,
+    exp_id: str,
     mean_edge_length_km: float,
     mean_speed_kmh: float,
     rel_std: float,
     base_output_folder,   
-    alpha: float,
     cplex_cfg: dict | None = None,
 
 ) -> dict:
     """
     Costruisce e risolve UNO dei modelli su una stessa Instance (GRID).
     """
-    dt = instance.dt
-    t_max = instance.t_max
-    num_requests = len(instance.K)
-    num_modules = len(instance.M)
-    num_trails = len(instance.P)
-    z_max = instance.Z_max
-    Q = instance.Q
-    c_km = instance.c_km
-    c_uns = instance.c_uns
-
 
     # Sottocartella specifica per questo modello
     output_folder = base_output_folder / model_name
@@ -213,7 +201,8 @@ def run_single_model(
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
 
-    configure_cplex(model, cplex_cfg)   # CPLEX configuration
+
+    configure_cplex(model, cplex_cfg)
 
     # ----------------
     # Solve
@@ -318,22 +307,23 @@ def run_single_model(
         "mean_speed": mean_speed_kmh,
         "std": rel_std,
         "horizon": horizon,
-        "dt": dt,
-        "t_max": t_max,
-        "num_modules": num_modules,
-        "num_trails": num_trails,
-        "z_max": z_max,
-        "Q": Q,
-        "c_km": c_km,
-        "c_uns": c_uns,
-        "num_requests": num_requests,
+        "dt": instance.dt,
+        "t_max": instance.t_max,
+        "num_modules": instance.num_modules,
+        "num_trails": instance.num_trail_modules,
+        "z_max": instance.Z_max,
+        "Q": instance.Q,
+        "c_km": instance.c_km,
+        "c_uns": instance.c_uns,
+        "num_requests": instance.num_requests,
         "served": served,
         "served_ratio": served_ratio,
         "q_min": q_min,
         "q_max": q_max,
         "alpha": alpha,
         "slack_min": slack_min,
-        "depot": depot,
+        "depot": instance.depot,
+
 
         # --- instance sizes ---
         "N_size": len(instance.N),
@@ -368,22 +358,12 @@ def run_single_model_city(
     model_name: str,
     network_path,
     requests_path,
-    t_max: int,
-    dt: int,
     horizon: int,
-    num_modules: int,
-    num_trails: int,
-    z_max: int | None,
-    Q: int,
-    c_km: float,
-    c_uns: float,
-    num_requests: int,
     q_min: int,
     q_max: int,
     slack_min: float,
-    depot: int,
     seed: int,
-    exp_id: int,
+    exp_id: str,
     mean_speed_kmh: float,
     base_output_folder,
     alpha: float,
@@ -411,7 +391,7 @@ def run_single_model_city(
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
 
-    configure_cplex(model, cplex_cfg) 
+    configure_cplex(model, cplex_cfg)
 
     # ----------------
     # Solve
@@ -514,22 +494,23 @@ def run_single_model_city(
         "city": city,
         "horizon": horizon,
         "mean_speed": mean_speed_kmh,
-        "dt": dt,
-        "t_max": t_max,
-        "num_modules": num_modules,
-        "num_trails": num_trails,
-        "z_max": z_max,
-        "Q": Q,
-        "c_km": c_km,
-        "c_uns": c_uns,
-        "num_requests": num_requests,
+        "dt": instance.dt,
+        "t_max": instance.t_max,
+        "num_modules": instance.num_modules,
+        "num_trails": instance.num_trail_modules,
+        "z_max": instance.Z_max,
+        "Q": instance.Q,
+        "c_km": instance.c_km,
+        "c_uns": instance.c_uns,
+        "num_requests": instance.num_requests,
         "served": served,
         "served_ratio": served_ratio,
         "q_min": q_min,
         "q_max": q_max,
         "alpha": alpha,
         "slack_min": slack_min,
-        "depot": depot,
+        "depot": instance.depot,
+
 
         # --- instance sizes ---
         "N_size": len(instance.N),

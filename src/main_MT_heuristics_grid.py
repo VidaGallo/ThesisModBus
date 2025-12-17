@@ -6,7 +6,6 @@ import random
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from collections import Counter
 
 
 # =========================
@@ -53,7 +52,6 @@ if __name__ == "__main__":
     rel_std = 0.66
     c_km = 1.0
     c_uns = 100.0
-    g_plat = None
 
     num_Nw = 2
     q_min, q_max = 1, 10
@@ -107,7 +105,6 @@ if __name__ == "__main__":
         Q=Q,
         c_km=c_km,
         c_uns=c_uns,
-        g_plat=g_plat,
         num_requests=num_requests,
         q_min=q_min,
         q_max=q_max,
@@ -141,22 +138,12 @@ if __name__ == "__main__":
             model_name=model_name,
             network_path=network_path,
             requests_path=requests_path,
-            t_max=t_max,
-            dt=dt,
             number=number,
             horizon=horizon,
-            num_modules=num_modules,
-            num_trails=num_trails,
-            z_max=z_max,
-            Q=Q,
-            c_km=c_km,
-            c_uns=c_uns,
-            g_plat=g_plat,
-            num_requests=num_requests,
             q_min=q_min,
             q_max=q_max,
+            alpha=alpha,
             slack_min=slack_min,
-            depot=depot,
             seed=seed,
             exp_id=exp_id,
             mean_edge_length_km=mean_edge_length_km,
