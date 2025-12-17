@@ -51,7 +51,8 @@ def generate_all_data(
     depot: int,
     seed: int = 23,
     mean_edge_length_km: float = 3.0,
-    mean_speed_kmh: float = 40.0
+    mean_speed_kmh: float = 40.0,
+    alpha: float = 0.65,
     ):
     """
     Generate continuous network + continuous requests,
@@ -98,6 +99,7 @@ def generate_all_data(
         slack_min=slack_min,
         time_horizon_max=float(horizon),
         depot=depot,
+        alpha=alpha,
         rng=rng
     )
 
@@ -141,6 +143,7 @@ def generate_all_data_asym(
     mean_speed_kmh: float = 40.0,
     rel_std: float = 0.66,
     seed: int = 23,
+    alpha: float = 0.65,
 ):
     """
     Generate continuous network + continuous requests,
@@ -190,6 +193,7 @@ def generate_all_data_asym(
         slack_min=slack_min,
         time_horizon_max=float(horizon),
         depot=depot,
+        alpha=alpha,
         rng=rng
     )
 
@@ -238,6 +242,7 @@ def generate_all_data_city(
     depot: int,
     seed: int = 23,
     mean_speed_kmh: float = 40.0,
+    alpha: float = 0.65,
 ):
     """
     Generate continuous network + continuous requests,
@@ -291,6 +296,7 @@ def generate_all_data_city(
         slack_min=slack_min,
         time_horizon_max=float(horizon),
         depot=depot,
+        alpha=alpha,
         rng=rng
     )
 

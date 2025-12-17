@@ -44,6 +44,7 @@ if __name__ == "__main__":
 
     q_min = 1
     q_max = 10
+    alpha = 0.65
     slack_min = 30.0
 
     # Parametri SPECIFICI
@@ -87,7 +88,8 @@ if __name__ == "__main__":
         seed=seed,
         num_Nw=num_Nw,
         mean_speed_kmh=mean_speed_kmh,
-        z_max=z_max
+        z_max=z_max,
+        alpha=alpha
     )
 
     

@@ -39,7 +39,8 @@ def build_instance_and_paths(
     mean_edge_length_km: float,
     mean_speed_kmh: float,
     rel_std: float,
-    z_max: int | None = None
+    z_max: int | None = None,
+    alpha: float = 0.65,
 ):
     """
     Generate the asymmetric GRID network and the requests, then build Instance.
@@ -60,6 +61,7 @@ def build_instance_and_paths(
         mean_edge_length_km=mean_edge_length_km,
         mean_speed_kmh=mean_speed_kmh,
         rel_std=rel_std,
+        alpha=alpha,
         seed=seed
     )
 
@@ -107,7 +109,8 @@ def build_instance_and_paths_city(
     seed: int,
     num_Nw: int,
     mean_speed_kmh: float,
-    z_max: int | None = None
+    z_max: int | None = None,
+    alpha: float = 0.65,
 ):
     """
     Generate the CITY network and the requests, then build Instance.
@@ -128,7 +131,8 @@ def build_instance_and_paths_city(
         slack_min=slack_min,
         mean_speed_kmh=mean_speed_kmh,
         depot=depot,
-        seed=seed
+        seed=seed,
+        alpha=alpha,
     )
 
     instance = load_instance_discrete(
@@ -160,17 +164,9 @@ def run_single_model(
     model_name: str,
     network_path,
     requests_path,
-    t_max: int,
-    dt: int,
     number: int,
     horizon: int,
-    num_modules: int,
-    num_trails: int,
-    z_max: int | None,
-    Q: int,
-    c_km: float,
-    c_uns: float,
-    num_requests: int,
+
     q_min: int,
     q_max: int,
     slack_min: float,
@@ -180,12 +176,24 @@ def run_single_model(
     mean_edge_length_km: float,
     mean_speed_kmh: float,
     rel_std: float,
-    base_output_folder,    
-    cplex_cfg: dict | None = None
+    base_output_folder,   
+    alpha: float,
+    cplex_cfg: dict | None = None,
+
 ) -> dict:
     """
     Costruisce e risolve UNO dei modelli su una stessa Instance (GRID).
     """
+    dt = instance.dt
+    t_max = instance.t_max
+    num_requests = len(instance.K)
+    num_modules = len(instance.M)
+    num_trails = len(instance.P)
+    z_max = instance.Z_max
+    Q = instance.Q
+    c_km = instance.c_km
+    c_uns = instance.c_uns
+
 
     # Sottocartella specifica per questo modello
     output_folder = base_output_folder / model_name
@@ -323,6 +331,7 @@ def run_single_model(
         "served_ratio": served_ratio,
         "q_min": q_min,
         "q_max": q_max,
+        "alpha": alpha,
         "slack_min": slack_min,
         "depot": depot,
 
@@ -377,6 +386,7 @@ def run_single_model_city(
     exp_id: int,
     mean_speed_kmh: float,
     base_output_folder,
+    alpha: float,
     cplex_cfg: dict | None = None
 ) -> dict:
     """
@@ -517,6 +527,7 @@ def run_single_model_city(
         "served_ratio": served_ratio,
         "q_min": q_min,
         "q_max": q_max,
+        "alpha": alpha,
         "slack_min": slack_min,
         "depot": depot,
 

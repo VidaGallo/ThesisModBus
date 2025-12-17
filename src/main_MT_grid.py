@@ -40,6 +40,7 @@ if __name__ == "__main__":
 
     q_min = 1
     q_max = 10
+    alpha = 0.65
     slack_min = 20.0
 
     # Parametri SPECIFICI
@@ -86,7 +87,8 @@ if __name__ == "__main__":
         mean_edge_length_km=mean_edge_length_km,
         mean_speed_kmh=mean_speed_kmh,
         rel_std=rel_std,
-        z_max=z_max
+        z_max=z_max,
+        alpha=alpha
     )
 
     

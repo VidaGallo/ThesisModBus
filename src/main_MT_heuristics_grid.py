@@ -57,6 +57,7 @@ if __name__ == "__main__":
 
     num_Nw = 2
     q_min, q_max = 1, 10
+    alpha = 0.65
     slack_min = 20.0
 
     # =========================
@@ -117,7 +118,8 @@ if __name__ == "__main__":
         mean_edge_length_km=mean_edge_length_km,
         mean_speed_kmh=mean_speed_kmh,
         rel_std=rel_std,
-        z_max=z_max
+        z_max=z_max,
+        alpha=alpha,
     )
 
     print("\nData used:")

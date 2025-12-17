@@ -39,7 +39,6 @@ class Instance:
     z_max: int                # max number of trail modules per main module (if None, computed as |P|/|M|)
     c_km: float               # cost per km
     c_uns: float              # penalty cost for unserved demand
-    g_plat: float             # reward for having a platoon (to subtract to the c_op)
 
 
     ### --- network-related parameters ---
