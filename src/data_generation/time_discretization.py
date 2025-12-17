@@ -93,6 +93,40 @@ def discretize_requests(
 
 
 
+def discretize_requests_dict(
+    requests: list[dict],
+    time_step_min: float,
+) -> list[dict]:
+    """
+    Discretizza finestre temporali di richieste CONTINUE.
+    Input/Output: lista di dict (nessun file).
+    """
+    req_out = []
+
+    for req in requests:
+        r = dict(req)  # copia shallow
+
+        T_k_min  = r["T_k_min"]
+        T_in_min = r["T_in_min"]
+        T_out_min = r["T_out_min"]
+
+        r["T_k_idx"] = interval_to_indices(
+            T_k_min[0], T_k_min[1], time_step_min
+        )
+        r["T_in_idx"] = interval_to_indices(
+            T_in_min[0], T_in_min[1], time_step_min
+        )
+        r["T_out_idx"] = interval_to_indices(
+            T_out_min[0], T_out_min[1], time_step_min
+        )
+
+        req_out.append(r)
+
+    return req_out
+
+
+
+
 def discretize_network_travel_times(
     input_path: str,
     output_path: str,
