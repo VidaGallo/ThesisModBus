@@ -159,7 +159,7 @@ def run_heu_model(
     tol:float = 0.1
 ) -> dict:
     """
-    Euristica
+    Euristica basata su sentizzazione per prob. su una stessa Instance (GRID).
     """
     start_heu_time = time.time()
 
@@ -170,6 +170,7 @@ def run_heu_model(
         req_disc = json.load(f)
 
     # Full instance (with original discrete data)
+    # Will be used for (1) intermediate evaluation and (2) last run
     I_full = load_instance_discrete_from_data(
             net_discrete=net_disc,
             reqs_discrete=req_disc,        # tutte le richieste originali
@@ -210,25 +211,28 @@ def run_heu_model(
     start_out_time = time.time()
     i = 0
     while (
-          (i < it_out) and                                   # stop if too many iterations
+          (i < it_out) and                                  # stop if too many iterations
           (time.time() - start_out_time < time_out) and      # stop if too much time
           (len(remaining_ids) >= n_keep)                     # stop if there are not enough requests remaining
         ):
         print(f"Nel out while i: {i}")
 
         ### Select k = keep elements 
-        # id GRIGI + id NERI
         selected_ids, remaining_ids = topk_ids_by_centroid_7d(req7d_to_select, n_keep)   # Selezione richieste GRIGIE 
         
-        ### Pick the requests (in the original format)
-        selected_req = pick_original_by_ids(req_original_to_select, selected_ids)   # new GRIGIE
-        remaining_req = pick_original_by_ids(req_original_to_select, selected_ids)    # NERE restanti
+        ### Pick the requests from original ones (in original format)
+        selected_now = pick_original_by_ids(req_original_to_select, selected_ids)   # Selezione richieste GRIGIE in formato originale
+        selected_full = selected_now + fixed_requests     # Unione con richieste già scelte nei giri precedenti (GRIGIE + ROSA)
+
+        ### Pick the rest of the requests from req7d
+        remaining_set = set(int(k) for k in remaining_ids)
+        remaining_req7d = [r for r in req7d_to_select if int(r["k"]) in remaining_set]
 
 
 
-        ###########################
-        ### INNER WHILE - BAYES ###
-        ###########################
+        ###################
+        ### OUTER WHILE ###
+        ###################
         start_in_time = time.time()
         j = 0
         f_obj_approx_best = 1e100
@@ -238,17 +242,26 @@ def run_heu_model(
             print(f"Nel in while j: {j}")
             f_obj_approx_best_old = f_obj_approx_best
             
-            ### 4D, o and d separate
-            - prendere richieste continue
-            - separarle in o e in D
-            - trasforarle in 4d com +q e -q
+            # Will be a GP in the future
+            fictitious_req, _labels = make_fictitious_requests_kmeans_7d(
+                remaining_req7d,
+                n_fict=n_fict,
+                standardize=True,
+                random_state=seed,
+            )
 
-            ### CLUSTERING of the remaining requests (dei NERI)
-
+            # Return to the original format (CONTINUOUS TIME)
+            fict_full = fict7d_to_requests_format(
+                fictitious_req,
+                node_xy=node_xy,
+                G=G,
+                slack_min=slack_min,
+                top_snap=10,
+                force_arrival_eq_sp=False,
+            )
 
             # Final merge
-            final_requests = rosa + grigi + neri    # GRIGIE + ROSA + ROSSE
-
+            final_requests = selected_full + fict_full    # GRIGIE + ROSA + ROSSE
 
             # Request discretization
             final_requests_disc = discretize_requests_dict(
@@ -258,10 +271,6 @@ def run_heu_model(
                                 depot = depot
                                 )
 
-            # Constriants rosa! come sempre
-
-            # Constrants sul clustering neri 
-            clusteirng_constriants
 
             # -----------------
             # MINI ROUTING
@@ -283,7 +292,7 @@ def run_heu_model(
                 )
             
             # Run mini routing to obtain new fixed cosntraints
-            candidate_constraints, f_obiettivo = mini_routing(
+            candidate_constraints = mini_routing(
                 instance=I_mr,                 
                 selected_ids=selected_ids,            # lista k (id richieste) che sono fissate
                 fixed_constr=fixed_constraints,    # constraints relativi alle richieste passate
@@ -292,6 +301,20 @@ def run_heu_model(
             )
 
 
+
+            # -----------------
+            # EVALUATE MINIRUTING (relaxed)
+            # -----------------
+            # Lower bound for the current solution
+            f_obj_approx_new = evaluate_minirouting_lowerbound(
+                I_full,    # Using original data
+                fixed_constr=candidate_constraints,
+                model_name=model_name,
+                cplex_cfg=cplex_cfg
+            )
+            if f_obj_approx_new < f_obj_approx_best:
+                f_obj_approx_best = f_obj_approx_new
+                best_candidate_constraints = copy.deepcopy(candidate_constraints)
 
             diff = abs(f_obj_approx_best_old - f_obj_approx_best)
 
