@@ -1,5 +1,6 @@
 import json
-from typing import Any, Dict, List, Tuple, Iterable
+from __future__ import annotations
+from typing import Any, Dict, Tuple, List, Iterable, Optional
 import math
 import numpy as np
 import networkx as nx
@@ -8,9 +9,9 @@ from typing import Literal
 from sklearn.cluster import KMeans
 import numpy as np
 from copy import deepcopy
+import random
 
-
-
+from utils.GP_def import *
 
 
 
@@ -106,43 +107,6 @@ def all_pairs_shortest_path_time_matrix(
 
 
 
-### Place the requests in a 2D space, 
-# such that the travel time (shortest path) is preserved as a distance between the points
-def mds_embed_nodes_from_sp(
-    G: nx.DiGraph,
-    weight: str = "time_min",
-    dim: int = 2,
-    symmetrize: str = "avg",
-    random_state: int = 23,
-    n_init: int = 4,
-    max_iter: int = 300,
-    normalized_stress: str = "auto",
-) -> Dict[int, np.ndarray]:
-    """
-    Returns: dict node_id -> np.array([x,y]).
-    Embedding tries to preserve shortest-path travel times as euclidean distances.
-    """
-    nodes = list(G.nodes())
-    D = all_pairs_shortest_path_time_matrix(
-        G, nodes, weight=weight, symmetrize=symmetrize, unreachable_value=None
-    )
-
-    mds = MDS(
-        n_components=dim,
-        dissimilarity="precomputed",
-        metric=True,                 # metric MDS
-        n_init=n_init,
-        max_iter=max_iter,
-        random_state=random_state,
-        normalized_stress=normalized_stress,
-    )
-
-    X = mds.fit_transform(D)  # shape (N, dim)
-
-    coord = {nodes[i]: X[i, :] for i in range(len(nodes))}
-    return coord
-
-
 
 
 
@@ -227,17 +191,126 @@ def topk_ids_by_centroid_7d(
 
 
 
+### Per ora RANDOM, in futuro EURISTICA
+def cluster_events_random_eventwise(
+    events4d: List[dict],
+    n_clusters: int,
+    p_noise: float = 0.2,
+    seed: int | None = None,
+    enforce_pair_noise: bool = True,   # se uno è -1 => entrambi -1
+) -> Dict[tuple[int, str], int]:
+    rng = random.Random(seed)
+
+    # assegna prima label indipendente per evento
+    tmp: Dict[int, Dict[str, int]] = {}
+    for e in events4d:
+        k = int(e["k"])
+        typ = str(e["type"])  # "P" or "D"
+
+        if rng.random() < p_noise:
+            c = -1
+        else:
+            c = rng.randrange(n_clusters)
+
+        tmp.setdefault(k, {})[typ] = c
+
+    # costruisci labels finali
+    labels: Dict[tuple[int, str], int] = {}
+    for k, d in tmp.items():
+        lp = int(d.get("P", -1))
+        ld = int(d.get("D", -1))
+
+        if enforce_pair_noise and (lp == -1 or ld == -1):
+            labels[(k, "P")] = -1
+            labels[(k, "D")] = -1
+        else:
+            labels[(k, "P")] = lp
+            labels[(k, "D")] = ld
+
+    return labels
 
 
 
-### Pick the original requests using the orignal id
-def pick_original_by_ids(original_reqs: List[Dict], selected_ids: List[int]) -> List[Dict]:
-    sel = set(int(k) for k in selected_ids)
-    return [r for r in original_reqs if int(r["id"]) in sel]
+### Fissare a 0 il clsuter -1
+def add_ignored_request_zero_constraints(mdl, I, r, a, b, w, s, ignored_ks, name="ign"):
+    M = list(I.M)
+    Nw = list(I.Nw)
+
+    for k in ignored_ks:
+        mdl.add_constraint(s[k] == 0, ctname=f"{name}_s0_k{k}")
+
+        for t in I.DeltaT[k]:
+            for m in M:
+                if (k,t,m) in r: mdl.add_constraint(r[(k,t,m)] == 0, ctname=f"{name}_r0_k{k}_t{t}_m{m}")
+                if (k,t,m) in a: mdl.add_constraint(a[(k,t,m)] == 0, ctname=f"{name}_a0_k{k}_t{t}_m{m}")
+                if (k,t,m) in b: mdl.add_constraint(b[(k,t,m)] == 0, ctname=f"{name}_b0_k{k}_t{t}_m{m}")
+
+            # w[k,i,t,m,mp]
+            for i in Nw:
+                for m in M:
+                    for mp in M:
+                        if m == mp: 
+                            continue
+                        key = (k, i, t, m, mp)
+                        if key in w:
+                            mdl.add_constraint(w[key] == 0, ctname=f"{name}_w0_k{k}_i{i}_t{t}_m{m}_mp{mp}")
 
 
 
 
+
+### FISSARE A O B
+
+
+
+
+### Pick the requests using the ID
+def pick_by_ids(items, ids, key):
+    sel = set(int(i) for i in ids)
+    return [x for x in items if int(x[key]) in sel]
+
+
+
+
+### Place the requests in a 2D space, 
+# such that the travel time (shortest path) is preserved as a distance between the points
+def mds_embed_nodes_from_sp(
+    G: nx.DiGraph,
+    weight: str = "time_min",
+    dim: int = 2,
+    symmetrize: str = "avg",
+    random_state: int = 23,
+    n_init: int = 4,
+    max_iter: int = 300,
+    normalized_stress: str = "auto",
+) -> Dict[int, np.ndarray]:
+    """
+    Returns: dict node_id -> np.array([x,y]).
+    Embedding tries to preserve shortest-path travel times as euclidean distances.
+    """
+    nodes = list(G.nodes())
+    D = all_pairs_shortest_path_time_matrix(
+        G, nodes, weight=weight, symmetrize=symmetrize, unreachable_value=None
+    )
+
+    mds = MDS(
+        n_components=dim,
+        dissimilarity="precomputed",
+        metric=True,                 # metric MDS
+        n_init=n_init,
+        max_iter=max_iter,
+        random_state=random_state,
+        normalized_stress=normalized_stress,
+    )
+
+    X = mds.fit_transform(D)  # shape (N, dim)
+
+    coord = {nodes[i]: X[i, :] for i in range(len(nodes))}
+    return coord
+
+
+
+# From 7D requests build 4D
 def build_events_4d_from_req7d(req7d: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Da richieste 7D (xo,yo,tP,xd,yd,tD,q) costruisce eventi 4D:
@@ -275,197 +348,9 @@ def build_events_4d_from_req7d(req7d: List[Dict[str, Any]]) -> List[Dict[str, An
 
 
 
-### Prende il nearest node
-def nearest_nodes_mds(x: float, y: float, node_xy: Dict[int, np.ndarray], top: int = 10):
-    arr = []
-    for nid, xy in node_xy.items():
-        dx = float(xy[0]) - x
-        dy = float(xy[1]) - y
-        arr.append((dx*dx + dy*dy, int(nid)))
-    arr.sort(key=lambda t: t[0])
-    return arr[:top]
-
-
-# Prendere (xo,yo) e (xd,yd) nello spazio MDS e trovare il nodo reale del grafo che, 
-# NELLO STESSO SPAZIO MDS, è più vicino.
-def snap_fict_request_to_graph_nodes(f: Dict, node_xy: Dict[int, np.ndarray], top: int = 10) -> Dict:
-    cand_o = nearest_nodes_mds(f["xo"], f["yo"], node_xy, top=top)
-    cand_d = nearest_nodes_mds(f["xd"], f["yd"], node_xy, top=top)
-
-    o = cand_o[0][1]
-    d = cand_d[0][1]
-
-    if o == d:
-        # scegli il primo candidato D diverso da o
-        for _, nid in cand_d[1:]:
-            if nid != o:
-                d = nid
-                break
-
-    return {
-        "k": int(f["k"]),
-        "o": int(o),
-        "d": int(d),
-        "tP": float(f["tP"]),
-        "tD": float(f["tD"]),
-        "q": int(f["q"]),
-        "n_agg": int(f.get("n_agg", 0)),
-        "snap_o_d2": float(cand_o[0][0]),
-        "snap_d_d2": float(cand_d[0][0]),
-    }
 
 
 
-### Conversion to the "original" request format
-def to_demand_generator_format(
-    G: nx.DiGraph,
-    reqs: List[Dict],
-    *,
-    slack_min: float,
-    force_arrival_eq_sp: bool = False,
-):
-    out = []
-
-    for r in reqs:
-        k = int(r["k"])
-        o = int(r["o"])
-        d = int(r["d"])
-        q = math.floor(r["q"] + 0.5)
-        tP = float(r["tP"])
-
-        # shortest path time
-        tau_sp = float(nx.shortest_path_length(G, o, d, weight="time_min"))
-
-        if force_arrival_eq_sp:
-            tD = tP + tau_sp
-        else:
-            tD = float(r["tD"])
-
-        delta = float(slack_min)
-
-        out.append({
-            "id": k,
-            "origin": o,
-            "destination": d,
-            "q_k": q,
-            "desired_departure_min": tP,
-            "desired_arrival_min": tD,
-            "slack_min": delta,
-            "tau_sp_min": tau_sp,
-            "T_k_min":  [tP, tD + delta],
-            "T_in_min": [tP, tP + delta / 2.0],
-            "T_out_min": [tP + tau_sp, tP + tau_sp + delta],
-        })
-
-    return out
-
-
-
-
-
-### Considering the fictitius points in 7d, they need to be brough back to the original space
-def fict7d_to_requests_format(
-    fict7d: List[Dict],
-    *,
-    node_xy: Dict[int, "np.ndarray"],
-    G: nx.DiGraph,
-    slack_min: float,
-    top_snap: int = 10,
-    force_arrival_eq_sp: bool = False,
-) -> List[Dict]:
-    """
-    Pipeline esterna:
-    fict7d (xo,yo,tP,xd,yd,tD,q, k<0)  ->
-      1) snap su nodi reali (o,d) usando node_xy (MDS)
-      2) conversione in formato richieste originale (id, origin, destination, T_k...)
-    """
-    # 1) snap: 7D -> (o,d,tP,tD,q)
-    fict_graph = [
-        snap_fict_request_to_graph_nodes(f, node_xy, top=top_snap)
-        for f in fict7d
-    ]
-
-    # 2) (o,d,...) -> formato richieste dictionary
-    fict_full = to_demand_generator_format(
-        G,
-        fict_graph,
-        slack_min=slack_min,
-        force_arrival_eq_sp=force_arrival_eq_sp,
-    )
-
-    return fict_full
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Per ora k-means, in futuro Bayes
-Request7D = Dict[str, float | int]
-def make_fictitious_requests_kmeans_7d(
-    remaining: List[Request7D],
-    n_fict: int,
-    *,
-    standardize: bool = True,
-    random_state: int = 23,
-    n_init: int = 10,
-) -> Tuple[List[Request7D], np.ndarray]:
-    """
-    Crea n_fict richieste fittizie da remaining (SEMPRE 7D: xo,yo,tP,xd,yd,tD,q)
-
-    Return:
-      fict_reqs : lista dict con k negativo, + n_agg
-      labels    : cluster label per ogni elemento di remaining
-    """
-    if len(remaining) < n_fict:
-        raise ValueError(f"Too few remaining requests ({len(remaining)}) to make {n_fict} fictitious.")
-
-    # matrice (K,7)
-    X = np.array(
-        [[r["xo"], r["yo"], r["tP"], r["xd"], r["yd"], r["tD"], r["q"]] for r in remaining],
-        dtype=float,
-    )
-
-    if standardize:
-        mu = X.mean(axis=0)
-        sd = X.std(axis=0)
-        sd = np.maximum(sd, 1e-8)
-        Xn = (X - mu) / sd
-    else:
-        Xn = X
-
-    kmeans = KMeans(n_clusters=n_fict, random_state=random_state, n_init=n_init)
-    labels = kmeans.fit_predict(Xn)
-
-    fict_reqs: List[Request7D] = []
-    for c in range(n_fict):
-        idx = np.where(labels == c)[0]
-        cluster = [remaining[i] for i in idx]
-        if not cluster:
-            continue
-
-        fict_reqs.append({
-            "k": -(c + 1),
-            "xo": float(np.mean([r["xo"] for r in cluster])),
-            "yo": float(np.mean([r["yo"] for r in cluster])),
-            "tP": float(np.mean([r["tP"] for r in cluster])),
-            "xd": float(np.mean([r["xd"] for r in cluster])),
-            "yd": float(np.mean([r["yd"] for r in cluster])),
-            "tD": float(np.mean([r["tD"] for r in cluster])),
-            "q":  int(np.sum([r["q"] for r in cluster])),   # aggrego capacità
-            "n_agg": int(len(cluster)),
-        })
-
-    return fict_reqs, labels
 
 
 

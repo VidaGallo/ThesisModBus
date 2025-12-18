@@ -123,11 +123,11 @@ if __name__ == "__main__":
             base_output_folder=paths["heur"],
             cplex_cfg=CPLEX_CFG,
             n_keep = 3,
-            n_fict = 3,
             it_out = 100,
             it_in = 50,
             time_out = 36_000,
             tol = 0.1
+            n_clust = 4
         )
         pd.DataFrame([res_heu]).to_csv(paths["summary"]/ "summary_heur.csv", index=False)
 
