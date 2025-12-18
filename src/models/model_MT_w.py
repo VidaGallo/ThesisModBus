@@ -11,7 +11,7 @@ def create_decision_variables_w(mdl: Model, I: Instance):
     M = I.M
     N = I.N
     Nw = I.Nw
-    print("Nw:", Nw)
+    #print("Nw:", Nw)
     A = I.A
     T = I.T
 

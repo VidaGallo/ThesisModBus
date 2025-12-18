@@ -8,7 +8,7 @@ from models.model_MT_w import *
 
 import time
 
-import random
+import copy
 from math import inf
 import numpy as np
 import pandas as pd
@@ -24,7 +24,7 @@ def mini_routing(
     fixed_constr: Dict[str, Dict[tuple, float]] | None,
     model_name: str = "w",
     cplex_cfg: dict | None = None,
-) -> Tuple[Any, Dict[str, Dict[tuple, float]], Any]:
+) -> Dict[str, Dict[tuple, float]]:
     """
     Crea e risolve il modello su 'instance' già pronta.
     Applica fix-and-optimize da old_constraints_dict.
@@ -168,6 +168,23 @@ def run_heu_model(
     with requests_disc_path.open("r", encoding="utf-8") as f:
         req_disc = json.load(f)
 
+    # Full instance (with original discrete data)
+    # Will be used for (1) intermediate evaluation and (2) last run
+    I_full = load_instance_discrete_from_data(
+            net_discrete=net_disc,
+            reqs_discrete=req_disc,        # tutte le richieste originali
+            dt=dt,
+            t_max=t_max,
+            num_modules=num_modules,
+            num_trail=num_trails,
+            Q=Q,
+            c_km=c_km,
+            c_uns=c_uns,
+            depot=depot,
+            num_Nw=num_Nw,
+            z_max=z_max
+        )
+
     ### Working with continuous requests and continuous network
     # Load original requests and project them in 7D (xo,yo,t0,xd,yd,td,q), all CONTINUOUS TIME
     G, req_original, req7d, node_xy = build_req7d_from_paths(
@@ -179,25 +196,25 @@ def run_heu_model(
     
 
     ### Request to be selected
-    remaining_ids = original_ids.copy()             # ID candidati GRIGI
-    req7d_to_select = req7d.copy()                  # 7D candidati GRIGI
-    req_original_to_select = req_original.copy()    # richieste candidati GRIGI
+    remaining_ids = original_ids.copy()                     # ID candidati GRIGI
+    req7d_to_select = copy.deepcopy(req7d)                  # 7D candidati GRIGI
+    req_original_to_select = copy.deepcopy(req_original)    # richieste candidati GRIGI
     
     ### Requests that were already selected in past
     fixed_requests = []        # List of dict       # richieste ROSA
-
+    fixed_constraints = {}     # Dictionary of fixed variables     # richieste ROSA
 
     ###################
     ### OUTER WHILE ###
     ###################
     start_out_time = time.time()
     i = 0
-    constraints_dict_old = {}       # constraints delle richieste ROSA
     while (
-          (i <= it_out) and                                  # stop if too many iterations
+          (i < it_out) and                                  # stop if too many iterations
           (time.time() - start_out_time < time_out) and      # stop if too much time
           (len(remaining_ids) >= n_keep)                     # stop if there are not enough requests remaining
         ):
+        print(f"Nel out while i: {i}")
 
         ### Select k = keep elements 
         selected_ids, remaining_ids = topk_ids_by_centroid_7d(req7d_to_select, n_keep)   # Selezione richieste GRIGIE 
@@ -217,13 +234,12 @@ def run_heu_model(
         ###################
         start_in_time = time.time()
         j = 0
-        f_obj_approx_old = inf
-        f_obj_approx_new = inf
-        
-        while (j < it_in) and (abs(f_obj_approx_old - f_obj_approx_new)) >= tol:
-            # Reinitialization
-            f_obj_approx_old = f_obj_approx_new
-            constraints_dict_new = constraints_dict_old.copy()   # ritorno alle constraint senza i ROSSI (ovvero solo le ROSA)
+        f_obj_approx_best = 1e100
+        best_candidate_constraints = None     # Dictionary with old + new constraints     # ROSA + GRIGI
+        diff = 1e100
+        while (j < it_in) and (diff) >= tol:
+            print(f"Nel in while j: {j}")
+            f_obj_approx_best_old = f_obj_approx_best
             
             # Will be a GP in the future
             fictitious_req, _labels = make_fictitious_requests_kmeans_7d(
@@ -246,14 +262,19 @@ def run_heu_model(
             # Final merge
             final_requests = selected_full + fict_full    # GRIGIE + ROSA + ROSSE
 
-            # Request dscretization
-            final_requests_disc = discretize_requests_dict(final_requests, dt)
+            # Request discretization
+            final_requests_disc = discretize_requests_dict(
+                                requests = final_requests, 
+                                time_step_min = dt, 
+                                network_disc_dict = net_disc,
+                                depot = depot
+                                )
 
 
             # -----------------
             # MINI ROUTING
             # -----------------
-            # Instance for current mini-rOuting
+            # Instance for current mini-routing
             I_mr = load_instance_discrete_from_data(
                 net_discrete = net_disc,
                 reqs_discrete = final_requests_disc, 
@@ -270,10 +291,10 @@ def run_heu_model(
                 )
             
             # Run mini routing to obtain new fixed cosntraints
-            constraints_dict_new = mini_routing(
+            candidate_constraints = mini_routing(
                 instance=I_mr,                 
                 selected_ids=selected_ids,            # lista k (id richieste) che sono fissate
-                fixed_constr=constraints_dict_old,    # constraints relativi alle richieste passate
+                fixed_constr=fixed_constraints,    # constraints relativi alle richieste passate
                 model_name=model_name,
                 cplex_cfg=cplex_cfg,
             )
@@ -283,31 +304,23 @@ def run_heu_model(
             # -----------------
             # EVALUATE MINIRUTING (relaxed)
             # -----------------
-            # Full instance (with original discrete data)
-            I_full = load_instance_discrete_from_data(
-                net_discrete=net_disc,
-                reqs_discrete=req_disc,        # tutte le richieste originali
-                dt=dt,
-                t_max=t_max,
-                num_modules=num_modules,
-                num_trail=num_trails,
-                Q=Q,
-                c_km=c_km,
-                c_uns=c_uns,
-                depot=depot,
-                num_Nw=num_Nw,
-                z_max=z_max
-            )
             # Lower bound for the current solution
             f_obj_approx_new = evaluate_minirouting_lowerbound(
-                I_full,
-                fixed_constr=constraints_dict_new,
+                I_full,    # Using original data
+                fixed_constr=candidate_constraints,
                 model_name=model_name,
                 cplex_cfg=cplex_cfg
             )
+            if f_obj_approx_new < f_obj_approx_best:
+                f_obj_approx_best = f_obj_approx_new
+                best_candidate_constraints = copy.deepcopy(candidate_constraints)
 
-            j += 1
-        
+            diff = abs(f_obj_approx_best_old - f_obj_approx_best)
+
+            j += 1   # j++
+            
+        stop_in_time =  time.time()
+        print(f"End in while , j = {j}: ", stop_in_time - start_in_time)
 
         
         ### Selected and now fixed requests (GRIGI diventati ROSA)
@@ -321,36 +334,20 @@ def run_heu_model(
         req7d_to_select = [r for r in req7d_to_select if int(r["k"]) not in selected_set]
         req_original_to_select = [r for r in req_original_to_select if int(r["id"]) not in selected_set]
 
-
-        constraints_dict_old = constraints_dict_new.copy()     ### Queste constriant saranno fissate in futuro (ROSA)
+        if best_candidate_constraints is None:
+            best_candidate_constraints = copy.deepcopy(fixed_constraints)
+        fixed_constraints = copy.deepcopy(best_candidate_constraints)     ### Queste constriant saranno fissate in futuro (ROSA)
         
         i += 1  # i++
-        stop_in_time =  time.time()
-        print(f"Inner while time, j = {j}: ", stop_in_time - start_in_time)
 
     stop_out_time =  time.time()
-    print(f"Outer while time, i = {i}: ", stop_out_time - start_out_time)
+    print(f"End out while, i = {i}: ", stop_out_time - start_out_time)
 
 
 
     # ----------------------------------------------
     # Solve complete model with complete constriants
     # ----------------------------------------------
-    # Finall full Instance
-    I_full_final = load_instance_discrete_from_data(
-        net_discrete=net_disc,
-        reqs_discrete=req_disc,
-        dt=dt,
-        t_max=t_max,
-        num_modules=num_modules,
-        num_trail=num_trails,
-        Q=Q,
-        c_km=c_km,
-        c_uns=c_uns,
-        depot=depot,
-        num_Nw=num_Nw,
-        z_max=z_max,
-    )
 
     ### Folder for the results
     output_folder = Path(base_output_folder) / f"{model_name}_HEU"
@@ -358,7 +355,7 @@ def run_heu_model(
 
     t_start_total = time.perf_counter()
     if model_name == "w":
-        model_final, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_w(I_full_final)
+        model_final, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_w(I_full)
         var_dicts = {
             "x": x, "y": y,
             "r": r, "w": w, "s": s,
@@ -374,8 +371,8 @@ def run_heu_model(
     configure_cplex(model_final, cplex_cfg)
 
     ### Apply fixed constraints
-    if constraints_dict_old:   
-        fix_constraints(model_final, var_dicts, constraints_dict_old)
+    if fixed_constraints:   
+        fix_constraints(model_final, var_dicts, fixed_constraints)
 
     # Solve the full model 
     t_start_solve = time.perf_counter()
@@ -425,18 +422,18 @@ def run_heu_model(
     ### Served requests summary
     if solution is not None:
         served_requests = []
-        for k in I_full_final.K:
+        for k in I_full.K:
             val = solution.get_value(s[k])
             if val is not None and val > 0.5:
                 served_requests.append(k)
 
         served = len(served_requests)
-        total = len(I_full_final.K)
+        total = len(I_full.K)
         served_ratio = served / total if total > 0 else 0.0
     else:
         served_requests = []
         served = 0
-        total = len(I_full_final.K)
+        total = len(I_full.K)
         served_ratio = 0.0
 
     print(f"[FINAL FULL {model_name}] -> served: {served}/{total}  ({served_ratio*100:.1f}%)")
@@ -461,7 +458,7 @@ def run_heu_model(
     result = {
         "exp_id": exp_id,
         "model_name": f"{model_name}_HEU_FINAL_FULL",
-        "num_Nw": I_full_final.num_Nw,
+        "num_Nw": I_full.num_Nw,
         "seed": seed,
         "number": number,
         "grid_nodes": number * number,
@@ -469,27 +466,27 @@ def run_heu_model(
         "mean_speed": mean_speed_kmh,
         "std": rel_std,
         "horizon": horizon,
-        "dt": I_full_final.dt,
-        "t_max": I_full_final.t_max,
-        "num_modules": I_full_final.num_modules,
-        "num_trails": I_full_final.num_trail_modules,
-        "z_max": I_full_final.Z_max,
-        "Q": I_full_final.Q,
-        "c_km": I_full_final.c_km,
-        "c_uns": I_full_final.c_uns,
-        "num_requests": I_full_final.num_requests,
+        "dt": I_full.dt,
+        "t_max": I_full.t_max,
+        "num_modules": I_full.num_modules,
+        "num_trails": I_full.num_trail_modules,
+        "z_max": I_full.Z_max,
+        "Q": I_full.Q,
+        "c_km": I_full.c_km,
+        "c_uns": I_full.c_uns,
+        "num_requests": I_full.num_requests,
         "served": served,
         "served_ratio": served_ratio,
         "q_min": q_min,
         "q_max": q_max,
         "alpha": alpha,
         "slack_min": slack_min,
-        "depot": I_full_final.depot,
-        "N_size": len(I_full_final.N),
-        "A_size": len(I_full_final.A),
-        "K_size": len(I_full_final.K),
-        "M_size": len(I_full_final.M),
-        "P_size": len(I_full_final.P),
+        "depot": I_full.depot,
+        "N_size": len(I_full.N),
+        "A_size": len(I_full.A),
+        "K_size": len(I_full.K),
+        "M_size": len(I_full.M),
+        "P_size": len(I_full.P),
         "status": status,
         "objective": objective,
         "mip_gap": mip_gap,
@@ -498,7 +495,6 @@ def run_heu_model(
         "output_folder": str(output_folder),
         "network_path": str(network_disc_path),
         "requests_path": str(requests_disc_path),
-        "n_fixed_families": len(constraints_dict_old),
     }
 
     return result

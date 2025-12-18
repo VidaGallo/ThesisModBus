@@ -65,7 +65,7 @@ def generate_all_data(
         Path("instances")
         / "GRID"
         / f"{number}x{number}"
-        / f"seed{seed}_K{num_requests}_sl{slack_min}_dt{dt}"
+        / f"seed{seed}_v{mean_speed_kmh}_h{horizon}_K{num_requests}_sl{slack_min}_dt{dt}"
     )
     base.mkdir(parents=True, exist_ok=True)
 
@@ -85,11 +85,9 @@ def generate_all_data(
 
 
     ### GENERATE CONTINUOUS REQUESTS + SAVING
-    G = load_network_as_graph(network_cont)
-
     generate_requests(
         output_path=requests_cont,
-        G=G,
+        network_path=network_cont,
         num_requests=num_requests,
         q_min=q_min,
         q_max=q_max,
@@ -100,19 +98,20 @@ def generate_all_data(
         rng=rng
     )
 
-    ### DISCRETIZE REQUESTS + SAVING
-    discretize_requests(
-        input_path=requests_cont,
-        output_path=requests_disc,
-        time_step_min=float(dt),
-    )
-
-
-    ### DISCRETIZE NETWORK + SAVING
+    ### DISCRETIZE REQUESTS & NETWORK
     discretize_network_travel_times(
         input_path=network_cont,
         output_path=network_disc,
         time_step_min=float(dt),
+    )
+
+    # DISCRETIZE REQUESTS (shortest path on the discrete netowork)
+    discretize_requests(
+        input_path=requests_cont,
+        output_path=requests_disc,
+        time_step_min=float(dt),
+        network_disc_path=network_disc,   # for discrete shortest path
+        depot=depot,                      # to check τ depot→origin discrete
     )
 
     # Return paths
@@ -149,7 +148,7 @@ def generate_all_data_asym(
         Path("instances")
         / "GRID_ASYM"
         / f"{number}x{number}"
-        / f"seed{seed}_K{num_requests}_sl{slack_min}_dt{dt}"
+        / f"seed{seed}_v{mean_speed_kmh}_h{horizon}_K{num_requests}_sl{slack_min}_dt{dt}"
     )
     base.mkdir(parents=True, exist_ok=True)
 
@@ -172,11 +171,9 @@ def generate_all_data_asym(
 
 
     ### GENERATE CONTINUOUS REQUESTS + SAVING
-    G = load_network_as_graph(network_cont)
-
     generate_requests(
         output_path=requests_cont,
-        G=G,
+        network_path=network_cont,
         num_requests=num_requests,
         q_min=q_min,
         q_max=q_max,
@@ -187,20 +184,20 @@ def generate_all_data_asym(
         rng=rng
     )
 
-
-
-    ### DISCRETIZE REQUESTS  + SAVING
-    discretize_requests(
-        input_path=requests_cont,
-        output_path=requests_disc,
-        time_step_min=float(dt),
-    )
-
-    ### DISCRETIZE NETWORK  + SAVING
+    ### DISCRETIZE REQUESTS & NETWORK
     discretize_network_travel_times(
         input_path=network_cont,
         output_path=network_disc,
         time_step_min=float(dt),
+    )
+
+    # DISCRETIZE REQUESTS (shortest path on the discrete netowork)
+    discretize_requests(
+        input_path=requests_cont,
+        output_path=requests_disc,
+        time_step_min=float(dt),
+        network_disc_path=network_disc,   # for discrete shortest path
+        depot=depot,                      # to check τ depot→origin discrete
     )
 
 
@@ -246,8 +243,7 @@ def generate_all_data_city(
         / "CITY"
         / subdir
         / city_slug
-        / f"seed{seed}_K{num_requests}_sl{slack_min}_dt{dt}"
-        / f"v{mean_speed_kmh}"
+        / f"seed{seed}_v{mean_speed_kmh}_h{horizon}_K{num_requests}_sl{slack_min}_dt{dt}"
     )
     base.mkdir(parents=True, exist_ok=True)
 
@@ -267,11 +263,9 @@ def generate_all_data_city(
 
 
     ### GENERATE CONTINUOUS REQUESTS + SAVING
-    G = load_network_as_graph(network_cont)
-
     generate_requests(
         output_path=requests_cont,
-        G=G,
+        network_path=network_cont,
         num_requests=num_requests,
         q_min=q_min,
         q_max=q_max,
@@ -282,19 +276,23 @@ def generate_all_data_city(
         rng=rng
     )
 
-
-    ### DISCRETIZE REQUESTS & NETWORK + SAVING
-    discretize_requests(
-        input_path=requests_cont,
-        output_path=requests_disc,
-        time_step_min=float(dt),
-    )
-
+    ### DISCRETIZE REQUESTS & NETWORK
     discretize_network_travel_times(
         input_path=network_cont,
         output_path=network_disc,
         time_step_min=float(dt),
     )
+
+    # DISCRETIZE REQUESTS (shortest path on the discrete netowork)
+    discretize_requests(
+        input_path=requests_cont,
+        output_path=requests_disc,
+        time_step_min=float(dt),
+        network_disc_path=network_disc,   # for discrete shortest path
+        depot=depot,                      # to check τ depot→origin discrete
+    )
+
+
 
     # Return paths
     return network_cont, requests_cont, network_disc, requests_disc

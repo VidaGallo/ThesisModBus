@@ -43,19 +43,23 @@ def compute_shortest_path_time(G: nx.Graph, origin: int, dest: int) -> float:
 ###################################
 def generate_requests(
     output_path,
-    G: nx.Graph,
+    network_path: str,
     num_requests: int,
     q_min: int = 1,
     q_max: int = 3,
     slack_min: float = 20.0,
-    time_horizon_max: float = 600.0,   # 10h
+    time_horizon_max: float = 600.0,
     depot: int = 0,
     alpha: float = 0.65,
-    rng=None,   
-) -> list:
+    rng=None,
+):
     """
-    Generate taxi-like requests with continuous time fields.
+    Generate requests with continuous time fields.
     """
+
+    # build graph internally
+    G = load_network_as_graph(network_path)
+
     # reproducible RNG
     rng = rng or random 
 

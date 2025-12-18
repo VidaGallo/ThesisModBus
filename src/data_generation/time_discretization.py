@@ -35,6 +35,7 @@ All discrete indices start at t = 1,
 import json
 import math
 from pathlib import Path
+import networkx as nx
 
 
 
@@ -57,35 +58,59 @@ def interval_to_indices(start_min: float, end_min: float, time_step_min: float):
 
 
 
+
+
 def discretize_requests(
     input_path: str,
     output_path: str,
     time_step_min: float,
+    network_disc_path: str | None = None,
+    depot: int = 0,
 ):
-    """
-    Load continuous-time taxi-like requests from JSON, discretize their
-    time windows, and save a JSON with discrete time indices.
-    """
     with open(input_path, "r", encoding="utf-8") as f:
         requests = json.load(f)
 
+    # Discretization of the shortest path
+    Gd = None
+    if network_disc_path is not None:
+        with open(network_disc_path, "r", encoding="utf-8") as f:
+            net = json.load(f)
+        Gd = nx.DiGraph()
+        for n in net["nodes"]:
+            Gd.add_node(int(n["id"]))
+        for e in net["edges"]:
+            Gd.add_edge(int(e["u"]), int(e["v"]), time_steps=int(e["time_steps"]))
+
+        def sp_steps(u: int, v: int) -> int:
+            path = nx.shortest_path(Gd, u, v, weight="time_steps")
+            return int(sum(Gd[a][b]["time_steps"] for a, b in zip(path[:-1], path[1:])))
+
     for req in requests:
-        T_k_min = req["T_k_min"]
+        # --- finestre discrete ---
+        T_k_min  = req["T_k_min"]
         T_in_min = req["T_in_min"]
-        T_out_min = req["T_out_min"]
+        T_out_min= req["T_out_min"]
 
-        # build discrete sets of indices
-        T_k_idx = interval_to_indices(T_k_min[0],  T_k_min[1],  time_step_min)
-        T_in_idx = interval_to_indices(T_in_min[0], T_in_min[1], time_step_min)
-        T_out_idx = interval_to_indices(T_out_min[0], T_out_min[1], time_step_min)
+        req["T_k_idx"]  = interval_to_indices(T_k_min[0],  T_k_min[1],  time_step_min)
+        req["T_in_idx"] = interval_to_indices(T_in_min[0], T_in_min[1], time_step_min)
+        req["T_out_idx"]= interval_to_indices(T_out_min[0],T_out_min[1],time_step_min)
 
-        req["T_k_idx"] = T_k_idx
-        req["T_in_idx"] = T_in_idx
-        req["T_out_idx"] = T_out_idx
+        # --- shortest path discreto ---
+        if Gd is not None:
+            o = int(req["origin"])
+            d = int(req["destination"])
+
+            tau_sp_steps = sp_steps(o, d)
+            tau_dep_steps = sp_steps(depot, o)
+
+            req["tau_sp_steps"] = tau_sp_steps
+            req["tau_sp_min_disc"] = float(tau_sp_steps) * float(time_step_min)
+
+            req["tau_depot_origin_steps"] = tau_dep_steps
+            req["tau_depot_origin_min_disc"] = float(tau_dep_steps) * float(time_step_min)
 
     out_path = Path(output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-
     with out_path.open("w", encoding="utf-8") as f:
         json.dump(requests, f, indent=2)
 
@@ -93,36 +118,73 @@ def discretize_requests(
 
 
 
+
+
+
+
 def discretize_requests_dict(
     requests: list[dict],
     time_step_min: float,
+    network_disc_dict: dict | None = None, 
+    depot: int = 0,
 ) -> list[dict]:
     """
-    Discretizza finestre temporali di richieste CONTINUE.
-    Input/Output: lista di dict (nessun file).
+    Discretizza richieste CONTINUE (lista di dict) in memoria.
+    - aggiunge T_k_idx, T_in_idx, T_out_idx
+    - se network_disc è fornito, aggiunge anche shortest path discreti:
+        tau_sp_steps, tau_sp_min_disc,
+        tau_depot_origin_steps, tau_depot_origin_min_disc
+    Ritorna: lista di dict (requests discretizzate).
     """
-    req_out = []
+
+    # Build discrete graph from dict (if provided)
+    Gd = None
+    if network_disc_dict is not None:
+        Gd = nx.DiGraph()
+        for n in network_disc_dict.get("nodes", []):
+            Gd.add_node(int(n["id"]))
+        for e in network_disc_dict.get("edges", []):
+            Gd.add_edge(
+                int(e["u"]), int(e["v"]),
+                time_steps=int(e["time_steps"])
+            )
+
+        def sp_steps(u: int, v: int) -> int:
+            path = nx.shortest_path(Gd, u, v, weight="time_steps")
+            return int(sum(Gd[a][b]["time_steps"] for a, b in zip(path[:-1], path[1:])))
+
+    req_out: list[dict] = []
 
     for req in requests:
-        r = dict(req)  # copia shallow
+        r = dict(req)  # copia
 
-        T_k_min  = r["T_k_min"]
-        T_in_min = r["T_in_min"]
+        # --- finestre discrete ---
+        T_k_min   = r["T_k_min"]
+        T_in_min  = r["T_in_min"]
         T_out_min = r["T_out_min"]
 
-        r["T_k_idx"] = interval_to_indices(
-            T_k_min[0], T_k_min[1], time_step_min
-        )
-        r["T_in_idx"] = interval_to_indices(
-            T_in_min[0], T_in_min[1], time_step_min
-        )
-        r["T_out_idx"] = interval_to_indices(
-            T_out_min[0], T_out_min[1], time_step_min
-        )
+        r["T_k_idx"]   = interval_to_indices(T_k_min[0],   T_k_min[1],   time_step_min)
+        r["T_in_idx"]  = interval_to_indices(T_in_min[0],  T_in_min[1],  time_step_min)
+        r["T_out_idx"] = interval_to_indices(T_out_min[0], T_out_min[1], time_step_min)
+
+        # --- shortest path discreto ---
+        if Gd is not None:
+            o = int(r["origin"])
+            d = int(r["destination"])
+
+            tau_sp = sp_steps(o, d)
+            tau_dep = sp_steps(int(depot), o)
+
+            r["tau_sp_steps"] = int(tau_sp)
+            r["tau_sp_min_disc"] = float(tau_sp) * float(time_step_min)
+
+            r["tau_depot_origin_steps"] = int(tau_dep)
+            r["tau_depot_origin_min_disc"] = float(tau_dep) * float(time_step_min)
 
         req_out.append(r)
 
     return req_out
+
 
 
 

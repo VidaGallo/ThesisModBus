@@ -35,7 +35,7 @@ if __name__ == "__main__":
     depot = 1198867366   # Centro Torino
 
     Q = 10
-    mean_speed_kmh = 100.0
+    mean_speed_kmh = 50.0
     c_km = 1.0
     c_uns = 100
 
@@ -45,13 +45,13 @@ if __name__ == "__main__":
     q_min = 1
     q_max = 10
     alpha = 0.65
-    slack_min = 10.0
+    slack_min = 20.0
 
     # Parametri SPECIFICI
     num_modules   = 2
     num_trails    = 3
     z_max         = 3      # max trail per main
-    num_requests  = 10
+    num_requests  = 5
     
 
     # Nomi dei modelli da eseguire

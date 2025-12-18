@@ -25,12 +25,12 @@ if __name__ == "__main__":
     # ----------------
     # Base params 
     # ----------------
-    horizon =108    # minuti
+    horizon =60    # minuti
     dt = 6
     depot = 0
 
     Q = 10
-    mean_speed_kmh = 40.0
+    mean_speed_kmh = 1.0
     mean_edge_length_km = 3.33
     rel_std = 0.66
     c_km = 1.0
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     q_min = 1
     q_max = 10
     alpha = 0.65
-    slack_min = 20.0
+    slack_min = 10.0
 
     # Parametri SPECIFICI
     number        = 2      # lato griglia

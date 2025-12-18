@@ -867,7 +867,7 @@ def generate_grid_network_city(
     # 1) RAW network
     city_network_raw, osm_graph = generate_city_network_raw(
         place=place,
-        default_speed_kmh=100,
+        default_speed_kmh=speed_kmh,
         plot=True,
         k_lateral=2,
         k_center=4,

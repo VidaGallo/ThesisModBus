@@ -90,6 +90,7 @@ class Instance:
             self.Nw = {node for node, deg in nodes_sorted[:self.num_Nw]}
         else:
             self.Nw = set()
+        #print("Nw:", self.Nw)
     
 
 
