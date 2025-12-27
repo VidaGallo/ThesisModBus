@@ -433,8 +433,8 @@ def add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
     #    (b) w <= x[m,i,t]
     #    (c) w <= x[mp,i,t]
     #    (d) sum_{i,m,mp≠m} w <= 1 
-    #    (e) r[k,t,m] <= 1 - sum_{i,mp≠m} w[k,i,t,m,mp]
-    #    (f) r[k,t,mp] >= sum_{i,m≠mp} w[k,i,t,m,mp]
+    #    NO (e) r[k,t,m] <= 1 - sum_{i,mp≠m} w[k,i,t,m,mp]
+    #    NO (f) r[k,t,mp] >= sum_{i,m≠mp} w[k,i,t,m,mp]
     # ------------------------------------------------------------------
 
     # (a), (b), (c): local constraints on each w
@@ -490,36 +490,36 @@ def add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
 
 
     # (e) Module m "loses" the request
-    for k in K:
-        for t in DeltaT[k]:
-            for m in M:
-                mdl.add_constraint(
-                    r[k, t, m] <=
-                    1 - mdl.sum(
-                        w[k, i, t, m, mp]
-                        for i in Nw
-                        for mp in M
-                        if mp != m and (k, i, t, m, mp) in w
-                    ),
-                    ctname=f"lose_req_k{k}_t{t}_m{m}"
-                )
+    #for k in K:
+    #    for t in DeltaT[k]:
+    #        for m in M:
+    #            mdl.add_constraint(
+    #                r[k, t, m] <=
+    #                1 - mdl.sum(
+    #                    w[k, i, t, m, mp]
+    #                    for i in Nw
+    #                    for mp in M
+    #                    if mp != m and (k, i, t, m, mp) in w
+    #                ),
+    #                ctname=f"lose_req_k{k}_t{t}_m{m}"
+    #            )
 
 
 
     # (f) Module mp "receives" the request
-    for k in K:
-        for t in DeltaT[k]:
-            for mp in M:
-                mdl.add_constraint(
-                    r[k, t, mp] >=
-                    mdl.sum(
-                        w[k, i, t, m, mp]
-                        for i in Nw
-                        for m in M
-                        if m != mp and (k, i, t, m, mp) in w
-                    ),
-                    ctname=f"receive_req_k{k}_t{t}_mp{mp}"
-                )
+    #for k in K:
+    #    for t in DeltaT[k]:
+    #        for mp in M:
+    #            mdl.add_constraint(
+    #                r[k, t, mp] >=
+    #                mdl.sum(
+    #                    w[k, i, t, m, mp]
+    #                    for i in Nw
+    #                    for m in M
+    #                    if m != mp and (k, i, t, m, mp) in w
+    #                ),
+    #                ctname=f"receive_req_k{k}_t{t}_mp{mp}"
+    #            )
 
     
 

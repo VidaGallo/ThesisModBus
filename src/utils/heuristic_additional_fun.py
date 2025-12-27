@@ -191,47 +191,87 @@ def topk_ids_by_centroid_7d(
 
 
 
+
+
+
+# From 7D requests build 4D
+def build_events_4d_from_req7d(req7d: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Da richieste 7D (xo,yo,tP,xd,yd,tD,q) costruisce eventi 4D:
+      - pickup: (xo,yo,tP,+q)
+      - drop  : (xd,yd,tD,-q)
+    """
+    events = []
+    for r in req7d:
+        k = int(r["k"])
+        q = float(r["q"])
+
+        events.append({
+            "k": k,
+            "type": "P",
+            "x": float(r["xo"]),
+            "y": float(r["yo"]),
+            "t": float(r["tP"]),
+            "q": +q,
+        })
+
+        events.append({
+            "k": k,
+            "type": "D",
+            "x": float(r["xd"]),
+            "y": float(r["yd"]),
+            "t": float(r["tD"]),
+            "q": -q,
+        })
+
+    return events
+
+
+
+
+
+
+
 ### Per ora RANDOM, in futuro EURISTICA
-def cluster_events_random_eventwise(
+def cluster_OD_events_random(
     events4d: List[dict],
     n_clusters: int,
     p_noise: float = 0.2,
     seed: int | None = None,
-    enforce_pair_noise: bool = True,   # se uno è -1 => entrambi -1
 ) -> Dict[tuple[int, str], int]:
+    """
+    labels = {
+        (1, "P"): 0,
+        (1, "D"): 2,
+
+        (3, "P"): -1,
+        (3, "D"): -1,
+
+        ...
+    }
+    """
     rng = random.Random(seed)
-
-    # assegna prima label indipendente per evento
-    tmp: Dict[int, Dict[str, int]] = {}
-    for e in events4d:
-        k = int(e["k"])
-        typ = str(e["type"])  # "P" or "D"
-
-        if rng.random() < p_noise:
-            c = -1
-        else:
-            c = rng.randrange(n_clusters)
-
-        tmp.setdefault(k, {})[typ] = c
-
-    # costruisci labels finali
     labels: Dict[tuple[int, str], int] = {}
-    for k, d in tmp.items():
-        lp = int(d.get("P", -1))
-        ld = int(d.get("D", -1))
 
-        if enforce_pair_noise and (lp == -1 or ld == -1):
+    # Si prendono gli ID (originali)
+    requests = set(e["k"] for e in events4d)
+
+    for k in requests:
+        # 1) decidi se la richiesta è rumore
+        if rng.random() < p_noise:
             labels[(k, "P")] = -1
             labels[(k, "D")] = -1
-        else:
-            labels[(k, "P")] = lp
-            labels[(k, "D")] = ld
+            continue
+
+        # 2) assegna cluster (qui P e D indipendenti)
+        labels[(k, "P")] = rng.randrange(n_clusters)
+        labels[(k, "D")] = rng.randrange(n_clusters)
 
     return labels
 
 
 
-### Fissare a 0 il clsuter -1
+### Fissare a 0 il cluster -1
 def add_ignored_request_zero_constraints(mdl, I, r, a, b, w, s, ignored_ks, name="ign"):
     M = list(I.M)
     Nw = list(I.Nw)
@@ -307,41 +347,6 @@ def mds_embed_nodes_from_sp(
 
     coord = {nodes[i]: X[i, :] for i in range(len(nodes))}
     return coord
-
-
-
-# From 7D requests build 4D
-def build_events_4d_from_req7d(req7d: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    Da richieste 7D (xo,yo,tP,xd,yd,tD,q) costruisce eventi 4D:
-      - pickup: (xo,yo,tP,+q)
-      - drop  : (xd,yd,tD,-q)
-    """
-    events = []
-    for r in req7d:
-        k = int(r["k"])
-        q = float(r["q"])
-
-        events.append({
-            "k": k,
-            "type": "P",
-            "x": float(r["xo"]),
-            "y": float(r["yo"]),
-            "t": float(r["tP"]),
-            "q": +q,
-        })
-
-        events.append({
-            "k": k,
-            "type": "D",
-            "x": float(r["xd"]),
-            "y": float(r["yd"]),
-            "t": float(r["tD"]),
-            "q": -q,
-        })
-
-    return events
-
 
 
 

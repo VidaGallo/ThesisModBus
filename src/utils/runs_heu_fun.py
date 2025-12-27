@@ -70,7 +70,6 @@ def mini_routing(
     instance,
     selected_ids: List[int],                                  # GRIGI: richieste da fissare dopo la solve
     fixed_constr: Optional[Dict[str, Dict[tuple, float]]],     # ROSA: fix già accumulati
-    *,
     labels_event: Optional[Dict[tuple[int, str], int]] = None, # {(k,"P"/"D"): cluster or -1}
     cluster_ks: Optional[Iterable[int]] = None,               # NERI: k su cui applicare labels_event
     model_name: str = "w",
@@ -80,10 +79,7 @@ def mini_routing(
     """
     Build+solve model with:
       1) old fixed constraints (ROSA)
-      2) event-wise clustering constraints on cluster_ks (NERI):
-         - if k has P or D in -1 => force entire request k to 0 (s,r,a,b,w)
-         - same module within pickup clusters (a)
-         - same module within dropoff clusters (b)
+      2) event-wise clustering constraints on cluster_ks (NERI)
 
     Returns:
       (updated_fixed_constr, objective_value_or_infeas_value)
@@ -229,13 +225,10 @@ def run_heu_model(
     )
 
 
-    original_ids = [r["id"] for r in req_original]   
-    
 
     ### Request to be selected
-    remaining_ids = original_ids.copy()                     # ID candidati GRIGI
-    req7d_to_select = copy.deepcopy(req7d)                  # 7D candidati GRIGI
-    req_original_to_select = copy.deepcopy(req_original)    # richieste candidati GRIGI
+    req7d_remaining = copy.deepcopy(req7d)                  # 7D candidati GRIGI
+    req_original_remaining= copy.deepcopy(req_original)    # richieste candidati GRIGI
     
     ### Requests that were already selected in past
     fixed_requests = []        # List of dict       # richieste ROSA
@@ -250,18 +243,17 @@ def run_heu_model(
     while (
           (i < it_out) and                                   # stop if too many iterations
           (time.time() - start_out_time < time_out) and      # stop if too much time
-          (len(remaining_ids) >= n_keep)                     # stop if there are not enough requests remaining
+          (len(req_original_remaining) >= n_keep)            # stop if there are not enough requests remaining
         ):
         print(f"Nel out while i: {i}")
 
         ### Select k = keep elements 
         # id GRIGI + id NERI
-        selected_ids, remaining_ids = topk_ids_by_centroid_7d(req7d_to_select, n_keep)   # Selezione richieste GRIGIE 
+        selected_ids, remaining_ids = topk_ids_by_centroid_7d(req7d_remaining, n_keep)   # Selezione richieste GRIGIE 
         
-        ### Pick the requests (in the original format)
-        remaining_req7d = pick_by_ids(req7d_to_select, remaining_ids)
-
-        events_req4d = build_events_4d_from_req7d(remaining_req7d)    # Separation of O and D
+        ### Remaining requests (NERE)
+        req7d_remaining = pick_by_ids(req7d_remaining, remaining_ids)       # new req7d_remaining
+        req4d_OD_remaining = build_events_4d_from_req7d(req7d_remaining)    # Separation of O and D
 
 
 
@@ -275,30 +267,29 @@ def run_heu_model(
         diff = 1e100
         best_candidate_constraints = None     # Dictionary with old + new constraints     # ROSA + GRIGI
         
-        theta = Theta(p_noise=0.2)    # Theta start for this round of GP
+        p_insodd = 0.9   # Theta start for this round of GP
         
         while (j < it_in) and (diff) >= tol:
             print(f"Nel in while j: {j}")
 
             ### 4D, CLUSTERING of the remaining requests (dei NERI)
-            labels_event =cluster_events_random_eventwise(
-                events4d = events_req4d,
+            labels_OD_events =cluster_OD_events_random(
+                events4d = req4d_OD_remaining,
                 n_clusters = k_clust,
-                p_noise = theta.p_noise,
-                seed = seed,
-                enforce_pair_noise = True   # Se O o D stanno in -1, entrambi in -1
+                p_noise = p_insodd,
+                seed = seed
             ) 
 
             ### Mini Routing to obtain new candidate cosntraints + obj_f
             candidate_constraints, candidate_obj_f = mini_routing(
                 instance=I_full,
-                selected_ids=selected_ids,
+                selected_ids=selected_ids,       # RICHIESTE per le quali verranno fissate le constraints 
                 fixed_constr=fixed_constraints,  # cosntraints già decise in passato (richieste ROSA)
                 model_name=model_name,
                 cplex_cfg=cplex_cfg,
-                labels=labels_event,
-                remaining_ids=remaining_ids,   # serve per sapere su quali k applicare vincoli
+                labels=labels_OD_events,          # CLUSTERIZZAZIONE
             )
+
 
             if candidate_obj_f < obj_f_best:
                 diff = abs(old_f_best_old - candidate_obj_f)   # We have an improvement
