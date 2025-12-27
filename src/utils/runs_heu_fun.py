@@ -7,71 +7,21 @@ from data_generation.generate_data import *
 from models.model_MT_w import *
 
 import time
-
 import copy
-from math import inf
-import numpy as np
-import pandas as pd
 
 from pathlib import Path
 from collections import Counter
 
 
 
-"""
-    # ----------------
-    # Build model
-    # ----------------
-    if model_name == "w":
-        model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_w(instance)
-        var_dicts = {
-            "x": x, "y": y,
-            "r": r, "w": w, "s": s,
-            "a": a, "b": b,
-            "D": D, "U": U,
-            "z": z, "kappa": kappa,
-            "h": h,
-        }
-    else:
-        raise ValueError(f"Unknown model_name: {model_name}")
 
-    # -----------------
-    # Configure solver
-    # -----------------
-    configure_cplex(model, cplex_cfg)
-
-    # --------------------------
-    # Apply previous constraints
-    # --------------------------
-    if fixed_constr:
-        fix_constraints(model, var_dicts, fixed_constr)    # Some constraints are already fixed
-    else:
-        fixed_constr = {}
-    # ----------------
-    # Solve
-    # ----------------
-    sol = model.solve(log_output=False)
-    if sol is None:
-        raise RuntimeError("mini_routing: infeasible or no solution found")
-
-    # ----------------------------
-    # Add NEW fixes for selected k
-    # ----------------------------
-    # Extract solution for k selected
-    new_fixed_constr = extract_solution_values_only_selected_k(var_dicts, sol, selected_ids)
-    # Merge old and new constraints
-    updated_fixed_constr = deep_merge_fixmaps(fixed_constr, new_fixed_constr)
-
-    ### se infeasable fare obective value = 1e100
-    return updated_fixed_constr
-"""
 
 def mini_routing(
     instance,
-    selected_ids: List[int],                                  # GRIGI: richieste da fissare dopo la solve
+    future_fixed_ids: List[int],         # GRIGI: richieste da fissare dopo la solve
+    clustered_ids: List[int],            # NERI: richieste clsuterizzate          
     fixed_constr: Optional[Dict[str, Dict[tuple, float]]],     # ROSA: fix già accumulati
-    labels_event: Optional[Dict[tuple[int, str], int]] = None, # {(k,"P"/"D"): cluster or -1}
-    cluster_ks: Optional[Iterable[int]] = None,               # NERI: k su cui applicare labels_event
+    labels_PD: Optional[Dict[tuple[int, str], int]] = None,    # {(k,"P"/"D"): cluster or -1}
     model_name: str = "w",
     cplex_cfg: dict | None = None,
     infeas_value: float = 1e100,
@@ -79,14 +29,14 @@ def mini_routing(
     """
     Build+solve model with:
       1) old fixed constraints (ROSA)
-      2) event-wise clustering constraints on cluster_ks (NERI)
+      2) new clustering constraints (NERI)
 
     Returns:
-      (updated_fixed_constr, objective_value_or_infeas_value)
+      (new_candidate_fixed_constr, objective_value_or_infeas_value)
     """
-    # ----------------
+    # -----------
     # Build model
-    # ----------------
+    # -----------
     if model_name == "w":
         model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_w(instance)
         var_dicts = {
@@ -102,52 +52,59 @@ def mini_routing(
 
     configure_cplex(model, cplex_cfg)
 
-    # --------------------------
-    # Apply previous constraints
-    # --------------------------
+
+    # ------------------
+    # Apply constraints
+    # ------------------
+    ### Old fixed constraints
     fixed_constr = {} if fixed_constr is None else fixed_constr
     if fixed_constr:
-        fix_constraints(model, var_dicts, fixed_constr)
+        fix_constraints_ab(model, var_dicts, fixed_constr)
 
-    # --------------------------
-    # Apply event-wise clustering constraints
-    # --------------------------
-    if labels_event is not None:
-        if cluster_ks is None:
-            raise ValueError("mini_routing: if labels_event is provided, you must also provide cluster_ks")
+    ### Constrainints for the not served requests + same module for each cluster
+    if len(clustered_ids)>0:
+        ignored_ks, active_ks = split_ignored_and_active_ks(labels_PD, clustered_ids)
 
-        cluster_ks = [int(k) for k in cluster_ks]
+        # Non-served requests
+        add_ignored_request_zero_constraints_ab(mdl=model, I=instance,
+                                                a=a, b=b,
+                                                ignored_ks=ignored_ks,
+                                                name="ign"
+                                                )
+        # Fixed modules cluster-wise (con introduzione nuova variabile al modello)
+        u = add_cluster_same_module_constraints_ab(mdl=model, I=instance,
+                                                a=a, b=b,
+                                                name="cl_mod"
+                                              )
 
-        ignored_ks, clusters_P, clusters_D = split_event_labels(labels_event, cluster_ks)
 
-        # -1 => force whole request to 0
-        if ignored_ks:
-            add_ignored_request_zero_constraints(model, instance, r, a, b, w, s, ignored_ks, name="ign")
 
-        # same module within pickup/drop clusters
-        if clusters_P or clusters_D:
-            add_cluster_same_module_constraints_eventwise(
-                model, instance, a, b, clusters_P, clusters_D, name="clE"
-            )
-
-    # ----------------
+    # -------
     # Solve
-    # ----------------
+    # -------
     sol = model.solve(log_output=False)
-    if sol is None:
-        return fixed_constr, infeas_value
+    if sol is None:   # Soluzione infeasable
+        return fixed_constr, infeas_value    
 
     obj = float(sol.objective_value)
 
-    # ----------------------------
-    # Add NEW fixes for selected k
-    # ----------------------------
-    new_fixed_constr = extract_solution_values_only_selected_k(var_dicts, sol, selected_ids)
-    updated_fixed_constr = deep_merge_fixmaps(fixed_constr, new_fixed_constr)
+
+
+
+    # ----------------------------------
+    # Add NEW constraints for selected k
+    # ----------------------------------
+    new_fixed_constr = extract_solution_values_only_selected_k_ab(var_dicts, sol, future_fixed_ids)
+    updated_fixed_constr = merge_constraints_ab(fixed_constr, new_fixed_constr, check_conflict=True)
 
     return updated_fixed_constr, obj
 
                 
+
+
+
+
+
 
 
 # ======================================================================
@@ -252,8 +209,8 @@ def run_heu_model(
         selected_ids, remaining_ids = topk_ids_by_centroid_7d(req7d_remaining, n_keep)   # Selezione richieste GRIGIE 
         
         ### Remaining requests (NERE)
-        req7d_remaining = pick_by_ids(req7d_remaining, remaining_ids)       # new req7d_remaining
-        req4d_OD_remaining = build_events_4d_from_req7d(req7d_remaining)    # Separation of O and D
+        req7d_remaining = pick_by_ids(req7d_remaining, remaining_ids, key="k")       # new req7d_remaining
+        req4d_PD_remaining = build_events_4d_from_req7d(req7d_remaining)    # Separation of PICKUP and DELIVERY
 
 
 
@@ -262,9 +219,8 @@ def run_heu_model(
         ######################################
         start_in_time = time.time()
         j = 0
-        obj_f_best = 1e100
-        old_f_best_old = 1e100
-        diff = 1e100
+        obj_f_best = 1e100    # Best obj.f. up to now
+        diff = 1e100          # To track improvements
         best_candidate_constraints = None     # Dictionary with old + new constraints     # ROSA + GRIGI
         
         p_insodd = 0.9   # Theta start for this round of GP
@@ -273,8 +229,8 @@ def run_heu_model(
             print(f"Nel in while j: {j}")
 
             ### 4D, CLUSTERING of the remaining requests (dei NERI)
-            labels_OD_events =cluster_OD_events_random(
-                events4d = req4d_OD_remaining,
+            labels_PD_events =cluster_PD_events_random(
+                events4d = req4d_PD_remaining,
                 n_clusters = k_clust,
                 p_noise = p_insodd,
                 seed = seed
@@ -283,23 +239,24 @@ def run_heu_model(
             ### Mini Routing to obtain new candidate cosntraints + obj_f
             candidate_constraints, candidate_obj_f = mini_routing(
                 instance=I_full,
-                selected_ids=selected_ids,       # RICHIESTE per le quali verranno fissate le constraints 
-                fixed_constr=fixed_constraints,  # cosntraints già decise in passato (richieste ROSA)
+                future_fixed_ids=selected_ids,           # requests that will have fixed constraints in the future
+                clustered_ids=remaining_ids,             # ID of the requests that were clsutered
+                fixed_constr=fixed_constraints,          # cosntraints già decise in passato (richieste ROSA)
+                labels_PD=labels_PD_events,              # CLUSTERIZZAZIONE
                 model_name=model_name,
-                cplex_cfg=cplex_cfg,
-                labels=labels_OD_events,          # CLUSTERIZZAZIONE
+                cplex_cfg=cplex_cfg                       
             )
 
 
             if candidate_obj_f < obj_f_best:
-                diff = abs(old_f_best_old - candidate_obj_f)   # We have an improvement
-
-                old_f_best_old = obj_f_best   # It's the new old
-                obj_f_best = candidate_obj_f
-                best_candidate_constraints = copy.deepcopy(candidate_constraints)   # Save the constraints (they are good)
+                diff = abs(obj_f_best - candidate_obj_f)   # We have an improvement
+                obj_f_best = candidate_obj_f     # A new better solution
+                best_candidate_constraints = copy.deepcopy(candidate_constraints)   # Save the new better constraints
                 
             j += 1   # j++
-            
+        
+        # ******************************************************** quiquiquiqquiquiqui
+
         stop_in_time =  time.time()
         print(f"End in while , j = {j}: ", stop_in_time - start_in_time)
 

@@ -1,14 +1,10 @@
-import json
 from __future__ import annotations
 from typing import Any, Dict, Tuple, List, Iterable, Optional
-import math
+import json
 import numpy as np
 import networkx as nx
 from sklearn.manifold import MDS
-from typing import Literal
-from sklearn.cluster import KMeans
-import numpy as np
-from copy import deepcopy
+import copy
 import random
 
 from utils.GP_def import *
@@ -107,6 +103,44 @@ def all_pairs_shortest_path_time_matrix(
 
 
 
+### Place the requests in a 2D space, 
+# such that the travel time (shortest path) is preserved as a distance between the points
+def mds_embed_nodes_from_sp(
+    G: nx.DiGraph,
+    weight: str = "time_min",
+    dim: int = 2,
+    symmetrize: str = "avg",
+    random_state: int = 23,
+    n_init: int = 4,
+    max_iter: int = 300,
+    normalized_stress: str = "auto",
+) -> Dict[int, np.ndarray]:
+    """
+    Returns: dict node_id -> np.array([x,y]).
+    Embedding tries to preserve shortest-path travel times as euclidean distances.
+    """
+    nodes = list(G.nodes())
+    D = all_pairs_shortest_path_time_matrix(
+        G, nodes, weight=weight, symmetrize=symmetrize, unreachable_value=None
+    )
+
+    mds = MDS(
+        n_components=dim,
+        dissimilarity="precomputed",
+        metric=True,                 # metric MDS
+        n_init=n_init,
+        max_iter=max_iter,
+        random_state=random_state,
+        normalized_stress=normalized_stress,
+    )
+
+    X = mds.fit_transform(D)  # shape (N, dim)
+
+    coord = {nodes[i]: X[i, :] for i in range(len(nodes))}
+    return coord
+
+
+
 
 
 
@@ -157,6 +191,14 @@ def build_req7d_from_paths(
     req7d.sort(key=lambda x: x["k"])
     return G, reqs, req7d, node_xy
 
+
+
+
+
+### Pick the requests using the ID
+def pick_by_ids(items, ids, key):
+    sel = set(int(i) for i in ids)
+    return [x for x in items if int(x[key]) in sel]
 
 
 
@@ -233,7 +275,7 @@ def build_events_4d_from_req7d(req7d: List[Dict[str, Any]]) -> List[Dict[str, An
 
 
 ### Per ora RANDOM, in futuro EURISTICA
-def cluster_OD_events_random(
+def cluster_PD_events_random(
     events4d: List[dict],
     n_clusters: int,
     p_noise: float = 0.2,
@@ -271,137 +313,59 @@ def cluster_OD_events_random(
 
 
 
-### Fissare a 0 il cluster -1
-def add_ignored_request_zero_constraints(mdl, I, r, a, b, w, s, ignored_ks, name="ign"):
-    M = list(I.M)
-    Nw = list(I.Nw)
-
-    for k in ignored_ks:
-        mdl.add_constraint(s[k] == 0, ctname=f"{name}_s0_k{k}")
-
-        for t in I.DeltaT[k]:
-            for m in M:
-                if (k,t,m) in r: mdl.add_constraint(r[(k,t,m)] == 0, ctname=f"{name}_r0_k{k}_t{t}_m{m}")
-                if (k,t,m) in a: mdl.add_constraint(a[(k,t,m)] == 0, ctname=f"{name}_a0_k{k}_t{t}_m{m}")
-                if (k,t,m) in b: mdl.add_constraint(b[(k,t,m)] == 0, ctname=f"{name}_b0_k{k}_t{t}_m{m}")
-
-            # w[k,i,t,m,mp]
-            for i in Nw:
-                for m in M:
-                    for mp in M:
-                        if m == mp: 
-                            continue
-                        key = (k, i, t, m, mp)
-                        if key in w:
-                            mdl.add_constraint(w[key] == 0, ctname=f"{name}_w0_k{k}_i{i}_t{t}_m{m}_mp{mp}")
 
 
 
 
-
-### FISSARE A O B
-
-
-
-
-### Pick the requests using the ID
-def pick_by_ids(items, ids, key):
-    sel = set(int(i) for i in ids)
-    return [x for x in items if int(x[key]) in sel]
-
-
-
-
-### Place the requests in a 2D space, 
-# such that the travel time (shortest path) is preserved as a distance between the points
-def mds_embed_nodes_from_sp(
-    G: nx.DiGraph,
-    weight: str = "time_min",
-    dim: int = 2,
-    symmetrize: str = "avg",
-    random_state: int = 23,
-    n_init: int = 4,
-    max_iter: int = 300,
-    normalized_stress: str = "auto",
-) -> Dict[int, np.ndarray]:
-    """
-    Returns: dict node_id -> np.array([x,y]).
-    Embedding tries to preserve shortest-path travel times as euclidean distances.
-    """
-    nodes = list(G.nodes())
-    D = all_pairs_shortest_path_time_matrix(
-        G, nodes, weight=weight, symmetrize=symmetrize, unreachable_value=None
-    )
-
-    mds = MDS(
-        n_components=dim,
-        dissimilarity="precomputed",
-        metric=True,                 # metric MDS
-        n_init=n_init,
-        max_iter=max_iter,
-        random_state=random_state,
-        normalized_stress=normalized_stress,
-    )
-
-    X = mds.fit_transform(D)  # shape (N, dim)
-
-    coord = {nodes[i]: X[i, :] for i in range(len(nodes))}
-    return coord
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def fix_constraints(
+### Variabili a e b già fissate in passato (soluzioni ottenute precedentemente)
+FixMapAB = Dict[str, Dict[Tuple[int, int, int], float]]  # {"a": {(k,t,m):1}, "b": {...}}
+def fix_constraints_ab(
     model,
-    var_dicts: Dict[str, Dict[Tuple, Any]],
-    fix_map: Dict[str, Dict[Tuple, float]],
-    *,
+    var_dicts: Dict[str, Dict[Tuple[int, int, int], Any]],
+    fix_map: Optional[FixMapAB],
     tol: float = 1e-9,
     name_prefix: str = "fix",
+    check_missing_var: bool = True,
 ) -> int:
     """
-    model      : docplex.mp.model.Model
-    var_dicts  : {"x": x_vars, "a": a_vars, ...} dove x_vars[(...)] è una Var docplex
-    fix_map    : {"x": {(i,j,t):1, ...}, "a": {...}, ...}
+    Aggiunge SOLO vincoli di fixing per famiglie 'a' e 'b':
+      a[k,t,m] == 0/1
+      b[k,t,m] == 0/1
 
-    Aggiunge vincoli var == value.
     Return: numero vincoli aggiunti.
     """
+    if not fix_map:
+        return 0
+
     n_added = 0
+    for fam in ("a", "b"):
+        fixes = fix_map.get(fam)
+        if not fixes:
+            continue
 
-    for fam, fixes in fix_map.items():
         if fam not in var_dicts:
-            raise KeyError(f"fix_map chiede famiglia '{fam}' ma non esiste in var_dicts")
+            raise KeyError(f"var_dicts non contiene la famiglia '{fam}'")
 
-        V = var_dicts[fam]  # dict indicizzato -> Var
+        V = var_dicts[fam]  # (k,t,m) -> Var
 
         for key, val in fixes.items():
             if key not in V:
-                raise KeyError(f"Variabile {fam}{key} non trovata nel modello (key={key})")
+                if check_missing_var:
+                    raise KeyError(f"Variabile {fam}{key} non trovata nel modello")
+                else:
+                    continue
 
             v = V[key]
             value = float(val)
 
-            # evita vincoli inutili se già fissata (opzionale)
+            # skip se già fissata a value
             lb = getattr(v, "lb", None)
             ub = getattr(v, "ub", None)
             if lb is not None and ub is not None and abs(lb - value) <= tol and abs(ub - value) <= tol:
                 continue
 
-            ct_name = f"{name_prefix}_{fam}_{'_'.join(map(str, key))}"
+            k, t, m = key
+            ct_name = f"{name_prefix}_{fam}_k{k}_t{t}_m{m}"
             model.add_constraint(v == value, ctname=ct_name)
             n_added += 1
 
@@ -411,132 +375,195 @@ def fix_constraints(
 
 
 
-def extract_solution_values_only_selected_k(
+
+### Si estraggono gli ID delle richieste da ignorare e da servire
+def split_ignored_and_active_ks(labels_event: dict, cluster_ks):
+    """
+    ignored_ks: k se almeno uno tra (k,'P') o (k,'D') è -1
+    active_ks : k clusterizzati con P e D entrambi != -1
+    """
+    cluster_set = set(int(k) for k in cluster_ks)
+    status = {}  # k -> set dei label visti (es. {-1, 2})
+
+    for (k, typ), c in labels_event.items():
+        k = int(k)
+        if k not in cluster_set:
+            continue
+        status.setdefault(k, set()).add(int(c))
+
+    ignored = []
+    active = []
+
+    for k, labels in status.items():
+        if -1 in labels:
+            ignored.append(k)
+        else:
+            active.append(k)
+
+    return sorted(ignored), sorted(active)
+
+
+
+
+
+### Fissare a 0 il cluster -1
+def add_ignored_request_zero_constraints_ab(mdl, I, a, b, ignored_ks, name="ign"):
+    M = list(I.M)
+    for k in ignored_ks:
+        k = int(k)
+        for t in I.DeltaT[k]:
+            for m in M:
+                key = (k, t, m)
+                if key in a:
+                    mdl.add_constraint(a[key] == 0, ctname=f"{name}_a0_k{k}_t{t}_m{m}")
+                if key in b:
+                    mdl.add_constraint(b[key] == 0, ctname=f"{name}_b0_k{k}_t{t}_m{m}")
+    return
+
+
+
+
+
+### Fissare lo stesso modulo per gli eventi OD appartenenti allo stesso cluster
+def add_cluster_same_module_constraints_ab(
+    mdl, I, a, b,
+    labels_PD: dict,       # {(k,"P"/"D"): c or -1}
+    active_ids: list[int], # richieste NON ignored
+    name="cl_mod",
+):
+    M = list(I.M)
+    active_set = set(int(k) for k in active_ids)
+
+    # cluster -> eventi (k,typ)
+    cluster_events: dict[int, list[tuple[int, str]]] = {}
+    for (k, typ), c in labels_PD.items():
+        k = int(k)
+        c = int(c)
+        typ = str(typ)
+
+        if k not in active_set:
+            continue
+        if c == -1:
+            continue
+        if typ not in ("P", "D"):
+            continue
+
+        cluster_events.setdefault(c, []).append((k, typ))
+
+    if not cluster_events:
+        return None
+
+    # 2) Nuova variabile u[c,m]: il modello sceglie il modulo del cluster
+    # u[c,m]
+    u = mdl.binary_var_dict(
+        keys=[(c, m) for c in cluster_events.keys() for m in M],
+        name=f"u_{name}"
+    )
+
+
+    # 3) un modulo per cluster
+    #   ∑_{m ∈ M} u[c,m] = 1    ∀ cluster c
+    for c in cluster_events.keys():
+        mdl.add_constraint(
+            mdl.sum(u[c, m] for m in M) == 1,
+            ctname=f"{name}_one_module_c{c}"
+        )
+
+    # 4) linking: eventi del cluster possono attivare solo a/b sul modulo scelto
+    # Pickup (typ == "P"):
+    #   a[k,t,m] ≤ u[c,m]
+    # Delivery (typ == "D"):
+    #   b[k,t,m] ≤ u[c,m]
+    for c, evs in cluster_events.items():
+        for (k, typ) in evs:
+            for t in I.DeltaT[int(k)]:
+                for m in M:
+                    key = (int(k), t, m)
+                    if typ == "P":   # "P", si fissa a
+                        if key in a:
+                            mdl.add_constraint(
+                                a[key] <= u[c, m],
+                                ctname=f"{name}_A_c{c}_k{k}_t{t}_m{m}"
+                            )
+                    else:  # "D", si fissa b
+                        if key in b:
+                            mdl.add_constraint(
+                                b[key] <= u[c, m],
+                                ctname=f"{name}_B_c{c}_k{k}_t{t}_m{m}"
+                            )
+
+    return u
+
+
+
+
+
+
+### Si estraggono a e b fissati dei GRIGI
+def extract_solution_values_only_selected_k_ab(
     var_dicts: Dict[str, Dict[Any, Any]],
     sol: Any,
-    selected_ids: Iterable[int],
-    *,
-    keep_fams: set[str] | None = None,
-    binary_round: bool = True,
-    binary_tol: float = 1e-6,
-    include_zeros: bool = True,
+    selected_ids: Iterable[int],   # richieste da fissare (GRIGI)
 ) -> Dict[str, Dict[Any, float]]:
     """
-    Estrae SOLO famiglie legate a k (r,w,a,b) + s per k selezionati.
-    include_zeros=True => salva anche 0 (così puoi fissare a 0).
+    Estrae dalla soluzione SOLO le variabili a e b = 1 per le richieste in selected_ids.
+    Output:
+      {
+        "a": {(k,t,m): 1.0, ...},
+        "b": {(k,t,m): 1.0, ...}
+      }
     """
     if sol is None:
         raise ValueError("sol is None")
 
-    sel = set(int(k) for k in selected_ids)
+    selected = set(int(k) for k in selected_ids)
 
-    # default: quelle che userai per fixing sulle richieste
-    if keep_fams is None:
-        keep_fams = {"r", "w", "a", "b", "s"}
+    out: Dict[str, Dict[Any, float]] = {
+        "a": {},
+        "b": {},
+    }
 
-    out: Dict[str, Dict[Any, float]] = {}
-
-    for fam in keep_fams:
+    for fam in ("a", "b"):
         if fam not in var_dicts:
             continue
 
-        V = var_dicts[fam]
-        fam_vals: Dict[Any, float] = {}
+        V = var_dicts[fam]   # (k,t,m) -> Var
 
-        # s ha chiave = k
-        if fam == "s":
-            for k, var in V.items():
-                if int(k) not in sel:
-                    continue
-                val = sol.get_value(var)
-                if val is None:
-                    continue
-                val = float(val)
-
-                # binaria: arrotonda (opzionale)
-                if binary_round:
-                    fam_vals[int(k)] = 1.0 if val >= 0.5 else 0.0
-                else:
-                    fam_vals[int(k)] = val
-
-            out[fam] = fam_vals
-            continue
-
-        # famiglie k-first: key[0] = k
-        for key, var in V.items():
-            if not isinstance(key, tuple) or len(key) == 0:
-                continue
-            if int(key[0]) not in sel:
+        for (k, t, m), var in V.items():
+            if int(k) not in selected:
                 continue
 
             val = sol.get_value(var)
             if val is None:
                 continue
-            val = float(val)
 
-            vt = getattr(getattr(var, "vartype", None), "short_name", None)
-            if vt == "B" and binary_round:
-                val = 1.0 if val >= 0.5 else 0.0
-            else:
-                # per intere/continue: se vuoi proprio fissare anche “quasi 0”
-                if abs(val) < binary_tol:
-                    val = 0.0
+            if float(val) >= 0.5:   # attiva
+                out[fam][(int(k), t, m)] = 1.0
 
-            if include_zeros:
-                fam_vals[key] = val
-            else:
-                # fallback (se un giorno vuoi tornare a salvare solo attive)
-                if vt == "B":
-                    if val >= 0.5:
-                        fam_vals[key] = 1.0
-                else:
-                    if abs(val) > binary_tol:
-                        fam_vals[key] = val
-
-        out[fam] = fam_vals
-
-    return out
+    return {fam: d for fam, d in out.items() if d}
 
 
 
 
 
 
-
-def deep_merge_fixmaps(
-    base: Dict[str, Dict[Tuple, Any]],
-    new: Dict[str, Dict[Tuple, Any]],
-    *,
-    check_conflict: bool = True,
-    tol: float = 1e-9,
-) -> Dict[str, Dict[Tuple, Any]]:
+### Si uniscono tutte le constraints fino a questo momento
+def merge_constraints_ab(base, new, check_conflict=True, tol=1e-9):
     """
-    Merge profonda di fixmaps:
-      base[fam][key] <- new[fam][key]
-
-    - se una famiglia non esiste, viene creata
-    - se una key esiste già:
-        - se stesso valore: ok
-        - se diverso:
-            - check_conflict=True -> ValueError
-            - check_conflict=False -> new sovrascrive
+    Merge dei vincoli di fixing per le sole variabili a e b, combinando quelli già fissati con i nuovi e rilevando eventuali conflitti.
     """
-    out = deepcopy(base)
+    base = {} if base is None else copy.deepcopy(base)
+    new  = {} if new  is None else new
 
-    for fam, fixes in new.items():
-        if fam not in out:
-            out[fam] = dict(fixes)
-            continue
+    out = {"a": dict(base.get("a", {})), "b": dict(base.get("b", {}))}
 
-        for key, val in fixes.items():
+    for fam in ("a", "b"):
+        for key, val in new.get(fam, {}).items():
+            v = float(val)
             if key in out[fam]:
-                old = out[fam][key]
-                if abs(old - val) > tol:
-                    if check_conflict:
-                        raise ValueError(
-                            f"Conflict on {fam}{key}: old={old}, new={val}"
-                        )
-                    # else: sovrascrivi
-            out[fam][key] = val
+                old = float(out[fam][key])
+                if abs(old - v) > tol and check_conflict:   #Se lo stesso (famiglia, key) ha valori diversi (oltre tol), errore (ValueError).
+                    raise ValueError(f"Conflict on {fam}{key}: old={old}, new={v}")
+            out[fam][key] = v
 
-    return out
+    return {fam: d for fam, d in out.items() if d}
