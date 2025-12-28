@@ -126,7 +126,7 @@ if __name__ == "__main__":
             it_out = 100,
             it_in = 50,
             time_out = 36_000,
-            tol = 0.1
+            tol = 0.1,
             n_clust = 4
         )
         pd.DataFrame([res_heu]).to_csv(paths["summary"]/ "summary_heur.csv", index=False)
