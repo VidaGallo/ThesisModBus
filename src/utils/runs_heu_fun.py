@@ -18,12 +18,12 @@ from collections import Counter
 
 def mini_routing(
     instance,
-    future_fixed_ids: List[int],         # GRIGI: richieste da fissare dopo la solve
-    clustered_ids: List[int],            # NERI: richieste clsuterizzate          
-    fixed_constr: Optional[Dict[str, Dict[tuple, float]]],     # ROSA: fix già accumulati
-    labels_PD: Optional[Dict[tuple[int, str], int]] = None,    # {(k,"P"/"D"): cluster or -1}
-    model_name: str = "w",
-    cplex_cfg: dict | None = None,
+    future_fixed_ids: List[int],       # GRIGI: richieste da fissare dopo la solve
+    clustered_ids: List[int],           # NERI: richieste clsuterizzate    
+    fixed_constr: Optional[Dict[str, Dict[tuple, float]]],        # ROSA: fix già accumulati
+    labels_PD: Optional[Dict[tuple[int, str], int]],              # {(k,"P"/"D"): cluster or -1}
+    base_model,
+    base_var_dicts,
     infeas_value: float = 1e100,
 ) -> Tuple[Dict[str, Dict[tuple, float]], float]:
     """
@@ -37,48 +37,35 @@ def mini_routing(
     # -----------
     # Build model
     # -----------
-    if model_name == "w":
-        model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_w(instance)
-        var_dicts = {
-            "x": x, "y": y,
-            "r": r, "w": w, "s": s,
-            "a": a, "b": b,
-            "D": D, "U": U,
-            "z": z, "kappa": kappa,
-            "h": h,
-        }
-    else:
-        raise ValueError(f"Unknown model_name: {model_name}")
+    model = base_model.clone()
+    var_dicts = map_vars_by_name(model, base_var_dicts)
 
-    configure_cplex(model, cplex_cfg)
+    a = var_dicts["a"]
+    b = var_dicts["b"]
 
 
-    # ------------------
-    # Apply constraints
-    # ------------------
-    ### Old fixed constraints
-    fixed_constr = {} if fixed_constr is None else fixed_constr
-    if fixed_constr:
-        fix_constraints_ab(model, var_dicts, fixed_constr)
+    # -------------------------
+    # Apply cluster constraints
+    # -------------------------
 
     ### Constrainints for the not served requests + same module for each cluster
     if len(clustered_ids)>0:
-        ignored_ks, active_ks = split_ignored_and_active_ks(labels_PD, clustered_ids)
+        if clustered_ids and labels_PD:
+            ignored_ks, active_ks = split_ignored_and_active_ks(labels_PD, clustered_ids)
 
-        # Non-served requests
-        add_ignored_request_zero_constraints_ab(mdl=model, I=instance,
+            # Non-served requests
+            add_ignored_request_zero_constraints_ab(mdl=model, I=instance,
                                                 a=a, b=b,
                                                 ignored_ks=ignored_ks,
                                                 name="ign"
                                                 )
-        # Fixed modules cluster-wise (con introduzione nuova variabile al modello)
-        u = add_cluster_same_module_constraints_ab(mdl=model, I=instance,
-                                                a=a, b=b,
-                                                name="cl_mod"
-                                              )
-
-
-
+            # Fixed modules cluster-wise (con introduzione nuova variabile al modello)
+            u = add_cluster_same_module_constraints_ab(mdl=model, I=instance, a=a, b=b,
+                                                  labels_PD=labels_PD,
+                                                  active_ids=active_ks,
+                                                  name="cl_mod",
+                                                  )
+    
     # -------
     # Solve
     # -------
@@ -87,9 +74,6 @@ def mini_routing(
         return fixed_constr, infeas_value    
 
     obj = float(sol.objective_value)
-
-
-
 
     # ----------------------------------
     # Add NEW constraints for selected k
@@ -144,8 +128,7 @@ def run_heu_model(
     it_out: int = 100,
     it_in: int = 50,
     time_out: float = 36_000,
-    tol:float = 0.1,
-    k_clust: int = 4,
+    n_clust: int = 4,
 ) -> dict:
     """
     Euristica
@@ -159,20 +142,7 @@ def run_heu_model(
         req_disc = json.load(f)
 
     # Full instance (with original discrete data)
-    I_full = load_instance_discrete_from_data(
-            net_discrete=net_disc,
-            reqs_discrete=req_disc,        # tutte le richieste originali
-            dt=dt,
-            t_max=t_max,
-            num_modules=num_modules,
-            num_trail=num_trails,
-            Q=Q,
-            c_km=c_km,
-            c_uns=c_uns,
-            depot=depot,
-            num_Nw=num_Nw,
-            z_max=z_max
-        )
+    I_full = instance
 
     ### Working with continuous requests and continuous network
     # Load original requests and project them in 7D (xo,yo,t0,xd,yd,td,q), all CONTINUOUS TIME
@@ -191,7 +161,7 @@ def run_heu_model(
     req_fixed = []        # List of dict       # richieste ROSA
     fixed_constraints = {}     # Dictionary of fixed variables     # richieste ROSA
 
-
+    
     ###################
     ### OUTER WHILE ###
     ###################
@@ -202,7 +172,7 @@ def run_heu_model(
           (time.time() - start_out_time < time_out) and      # stop if too much time
           (len(req_original_remaining) >= n_keep)            # stop if there are not enough requests remaining
         ):
-        print(f"Nel out while i: {i}")
+        #print(f"Nel out while i: {i}")
 
         ### Select k = keep elements 
         # id GRIGI + id NERI
@@ -226,40 +196,63 @@ def run_heu_model(
         start_in_time = time.time()
         j = 0
         obj_f_best = 1e100    # Best obj.f. up to now
-        diff = 1e100          # To track improvements
         best_candidate_constraints = None     # Dictionary with old + new constraints     # ROSA + GRIGI
         
         p_insodd = 0.9   # Theta start for this round of GP
+        diff = p_insodd / max(it_in, 1)
         
-        while (j < it_in) and (diff) >= tol:
-            print(f"Nel in while j: {j}")
+        no_improve = 0   # Number of no improvements in f.obj
+        patience = 5
+
+        ### Creazione del base model con fixed constraints (senza clustering)
+        base_model, base_var_dicts = build_base_model_with_fixed_constraints(
+            instance=I_full,
+            model_name=model_name,
+            fixed_constr=fixed_constraints,
+            cplex_cfg=cplex_cfg,
+        )
+        seen_signatures: set[int] = set()    # Hash clustering generati e studiati
+        while (j < it_in) and no_improve < patience:
+            #print(f"Nel in while j: {j}")
             
             ### 4D, CLUSTERING of the remaining requests (dei NERI)
             labels_PD_events =cluster_PD_events_random(
                 events4d = req4d_PD_remaining,
-                n_clusters = k_clust,
+                n_clusters = n_clust,
                 p_noise = p_insodd,
-                seed = seed
+                seed = seed + j    #cambiare seed per cambiare clustering (cmq riproducibile)
             ) 
+            p_insodd -= diff  # Man mano si prova a soddisfare più richieste
             
-            ### tu elenco features del gaussian process
+            ### Verifica clustering già studiato
+            sig = tuple(sorted(labels_PD_events.items()))
+            sig_hash = hash(sig)
+            if sig_hash in seen_signatures:   # clustering già studiato
+                j += 1   # j++
+                continue
+            seen_signatures.add(sig_hash)
 
             ### Mini Routing to obtain new candidate cosntraints + obj_f
             candidate_constraints, candidate_obj_f = mini_routing(
                 instance=I_full,
-                future_fixed_ids=selected_ids,           # requests that will have fixed constraints in the future
-                clustered_ids=remaining_ids,             # ID of the requests that were clsutered
-                fixed_constr=fixed_constraints,          # cosntraints già decise in passato (richieste ROSA)
-                labels_PD=labels_PD_events,              # CLUSTERIZZAZIONE
-                model_name=model_name,
-                cplex_cfg=cplex_cfg                       
+                future_fixed_ids=selected_ids,       # requests that will have fixed constraints in the future
+                clustered_ids=remaining_ids,         # ID of the requests that were clsutered
+                fixed_constr=fixed_constraints,      # cosntraints già decise in passato (richieste ROSA)
+                labels_PD=labels_PD_events,          # CLUSTERIZZAZIONE
+                base_model=base_model,               # base model with FIXED CONSTRAINTS
+                base_var_dicts=base_var_dicts,
             )
+              
+
+            print(f"Inner while, j={j}, f.obj={candidate_obj_f}")
 
 
-            if candidate_obj_f < obj_f_best:
-                diff = abs(obj_f_best - candidate_obj_f)   # We have an improvement
-                obj_f_best = candidate_obj_f     # A new better solution
-                best_candidate_constraints = copy.deepcopy(candidate_constraints)   # Save the new better constraints
+            if candidate_obj_f < obj_f_best:   # We have an improvement
+                obj_f_best = candidate_obj_f    # A new better solution
+                best_candidate_constraints = copy.deepcopy(candidate_constraints)    # Save the new better constraints
+                no_improve = 0
+            else:
+                no_improve += 1
                 
             
             j += 1   # j++
@@ -267,7 +260,7 @@ def run_heu_model(
     
 
         stop_in_time =  time.time()
-        print(f"End in while , j = {j}: ", stop_in_time - start_in_time)
+        print(f"END In while, j = {j}, f_obj = {obj_f_best}, time = {stop_in_time - start_in_time}")
 
 
         if best_candidate_constraints is None:
@@ -275,9 +268,12 @@ def run_heu_model(
         fixed_constraints = copy.deepcopy(best_candidate_constraints)     ### Queste constriant saranno fissate in futuro (ROSA)
         
         i += 1  # i++
+        print(f"Outer while, i={i}, f.obj={obj_f_best}")
+        print("\n")
 
     stop_out_time =  time.time()
-    print(f"End out while, i = {i}: ", stop_out_time - start_out_time)
+    print(f"END Out while, i = {i}, time = {stop_out_time - start_out_time}")
+    print("\n")
 
 
 

@@ -8,6 +8,8 @@ import copy
 import random
 
 from utils.GP_def import *
+from models.model_MT_w import *
+from utils.cplex_config import *
 
 
 
@@ -152,7 +154,7 @@ def build_req7d_from_paths(
     sp_weight: str = "time_min",     # shortest path on times
     symmetrize: str = "avg",         # to simmetrize the distances
     dim: int = 2,                    # dim of the embedding (x,y)
-) -> Tuple[nx.DiGraph, List[Request], Dict[int, Tuple[float, float]]]:
+) -> Tuple[nx.DiGraph, List[Dict[str, Any]], List[Request], Dict[int, np.ndarray]]:
     """
     Carica rete+richieste, crea embedding MDS, costruisce req6d e aggiunge la 7a dimensione 'cap'.
     """
@@ -296,7 +298,7 @@ def cluster_PD_events_random(
     labels: Dict[tuple[int, str], int] = {}
 
     # Si prendono gli ID (originali)
-    requests = set(e["k"] for e in events4d)
+    requests = sorted({int(e["k"]) for e in events4d})
 
     for k in requests:
         # 1) decidi se la richiesta è rumore
@@ -567,3 +569,66 @@ def merge_constraints_ab(base, new, check_conflict=True, tol=1e-9):
             out[fam][key] = v
 
     return {fam: d for fam, d in out.items() if d}
+
+
+
+
+
+
+
+
+
+### Costruzione modello con fixed constraints
+def build_base_model_with_fixed_constraints(
+    instance,
+    model_name: str,
+    fixed_constr: Optional[Dict[str, Dict[tuple, float]]],
+    cplex_cfg: dict | None = None,
+):
+    """
+    Costruisce il modello BASE
+    Applica SOLO i fixed constraints
+    """
+
+    ### Build model
+    if model_name == "w":
+        model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_w(instance)
+        var_dicts = {
+            "x": x, "y": y,
+            "r": r, "w": w, "s": s,
+            "a": a, "b": b,
+            "D": D, "U": U,
+            "z": z, "kappa": kappa,
+            "h": h,
+        }
+    else:
+        raise ValueError(f"Unknown model_name: {model_name}")
+
+    configure_cplex(model, cplex_cfg)
+
+    ### Apply FIXED constraints (ROSA)
+    if fixed_constr:
+        fix_constraints_ab(model, var_dicts, fixed_constr)
+
+    return model, var_dicts
+
+
+
+
+
+### Funzione per mappare le variaibli quando si clona il modello
+def map_vars_by_name(model, base_var_dicts):
+    """
+    Rimappa le variabili del clone usando i nomi.
+    base_var_dicts: dict fam -> dict key -> docplex_var (del base model)
+    return: dict fam -> dict key -> docplex_var (del clone)
+    """
+    mapped = {}
+    for fam, V in base_var_dicts.items():
+        mapped[fam] = {}
+        for key, var in V.items():
+            v2 = model.get_var_by_name(var.name)
+            if v2 is None:
+                raise KeyError(f"Var not found in clone: fam={fam}, key={key}, name={var.name}")
+            mapped[fam][key] = v2
+    return mapped

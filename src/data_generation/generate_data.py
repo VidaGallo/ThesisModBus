@@ -24,6 +24,10 @@ from .time_discretization import *
 
 import random
 import numpy as np
+import hashlib
+from datetime import datetime
+
+
 
 def set_seed(seed: int) -> random.Random:
     if seed is None:
@@ -37,6 +41,22 @@ def set_seed(seed: int) -> random.Random:
 
 
 
+### To create a HASH of the instance (in order to not repeat instances generation unecessarly)
+def canonical_dumps(d: dict) -> str:
+    return json.dumps(d, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+def make_hash(params: dict, n: int = 12) -> str:
+    s = canonical_dumps(params)
+    return hashlib.sha1(s.encode("utf-8")).hexdigest()[:n]
+
+def write_meta(base: Path, meta: dict) -> None:
+    meta = dict(meta)
+    meta["created_at"] = datetime.now().isoformat(timespec="seconds")
+    (base / "meta.json").write_text(json.dumps(meta, indent=2, sort_keys=True), encoding="utf-8")
+
+
+
+### SYMMETRIC GRID
 def generate_all_data(
     number: int,
     horizon: int,
@@ -119,6 +139,7 @@ def generate_all_data(
 
 
 
+### ASSYMETRIC GRID
 def generate_all_data_asym(
     number: int,
     horizon: int,
@@ -206,7 +227,7 @@ def generate_all_data_asym(
 
 
 
-
+### CITY GRAPH
 def generate_all_data_city(
     city: str,      # city name
     subdir: str,     # subdirectory name

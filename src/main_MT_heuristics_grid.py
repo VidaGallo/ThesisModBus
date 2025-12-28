@@ -3,7 +3,7 @@ from utils.runs_heu_fun import *
 import random, numpy as np, pandas as pd
 from pathlib import Path
 
-RUN_EXACT = False
+RUN_EXACT = True
 RUN_HEUR  = True
 
 def set_seed(seed: int):
@@ -26,18 +26,18 @@ if __name__ == "__main__":
     set_seed(seed)
 
     # params...
-    number = 2    # side grid
-    horizon = 108
-    dt = 6
+    number = 3    # side grid
+    horizon =120
+    dt = 5
     depot = 0
-    num_requests = 6
+    num_requests = 15
     q_min, q_max = 1, 10
     alpha = 0.65
     slack_min = 20.0
     Q = 10
     c_km = 1.0
     c_uns = 100.0
-    num_modules = 2
+    num_modules = 3
     num_trails = 6
     z_max = 3
     num_Nw = 2
@@ -74,6 +74,7 @@ if __name__ == "__main__":
 
     # EXACT
     if RUN_EXACT:
+        exact_start = time.time()
         print("\n")
         print("*"*50)
         print("EXACT")
@@ -93,11 +94,14 @@ if __name__ == "__main__":
             cplex_cfg=CPLEX_CFG,
         )
         pd.DataFrame([res_exact]).to_csv(paths["summary"]/ "summary_exact.csv", index=False)
+        exact_end = time.time()
+        exact_time = exact_end - exact_start
 
 
 
     # HEURISTIC
     if RUN_HEUR:
+        heu_start = time.time()
         print("\n")
         print("*"*50)
         print("HEURISTIC")
@@ -122,17 +126,48 @@ if __name__ == "__main__":
             rel_std=rel_std,
             base_output_folder=paths["heur"],
             cplex_cfg=CPLEX_CFG,
-            n_keep = 3,
-            it_out = 100,
-            it_in = 50,
+            n_keep = 4,
+            it_out = 1000,   # <- usually stop earlier after fixing all the requests
+            it_in = 20,
             time_out = 36_000,
-            tol = 0.1,
             n_clust = 4
         )
         pd.DataFrame([res_heu]).to_csv(paths["summary"]/ "summary_heur.csv", index=False)
+        heu_end = time.time()
+        heu_time = heu_end - heu_start
 
     # MERGE SUMMARY
     rows = []
     if RUN_EXACT: rows.append(res_exact)
     if RUN_HEUR:  rows.append(res_heu)
     pd.DataFrame(rows).to_csv(paths["summary"]/ "summary_all.csv", index=False)
+
+
+
+
+### FINAL RESULTS
+print("\n")
+print("*"*50)
+print("FINAL COMPARISON (EXACT vs HEURISTIC)")
+
+if RUN_EXACT and RUN_HEUR:
+    print(
+        f"EXACT     | served = {res_exact.get('served')} / {res_exact.get('num_requests')} "
+        f"({100*res_exact.get('served_ratio',0):.1f}%)"
+    )
+    print(
+        f"HEURISTIC | served = {res_heu.get('served')} / {res_heu.get('num_requests')} "
+        f"({100*res_heu.get('served_ratio',0):.1f}%)"
+    )
+    print("\n")
+    if res_exact.get("objective") is not None and res_heu.get("objective") is not None:
+        gap = ((res_heu["objective"] - res_exact["objective"]) / abs(res_exact["objective"])) * 100.0
+        print(
+            f"EXACT = {res_exact['objective']:.3f}, "
+            f"HEUR = {res_heu['objective']:.3f}"
+        )
+    print(f"RELATIVE GAP (HEUR vs EXACT): {gap:+.2f}%")
+    print("\n")
+    dt_abs = abs(heu_time - exact_time)
+    print(f"exact = {exact_time:.2f}s, heuristic = {heu_time:.2f}")
+    print(f"TIME DIFF (HEUR vs EXACT): {dt_abs:+.2f}%")
