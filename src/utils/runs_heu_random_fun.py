@@ -10,8 +10,6 @@ import time
 import copy
 
 from pathlib import Path
-from collections import Counter
-
 
 
 
@@ -27,7 +25,7 @@ def mini_routing(
     warm_start_bool: bool = False,
     mip_start: Optional[Dict[str, float]] = None,   # Partial solution proposal (for warm start)
     infeas_value: float = 1e100,
-) -> Tuple[Dict[str, Dict[tuple, float]], float]:
+) -> Tuple[Dict[str, Dict[tuple, float]], float, Optional[Dict[str, float]]]:
     """
     Build+solve model with:
       1) old fixed constraints (ROSA)
@@ -54,7 +52,6 @@ def mini_routing(
     # -------------------------
     # Apply cluster constraints
     # -------------------------
-
     ### Constrainints for the not served requests + same module for each cluster
     if len(clustered_ids)>0:
         if clustered_ids and labels_PD:
@@ -102,8 +99,6 @@ def mini_routing(
 
 
 
-
-
 # ======================================================================
 #  RUN HEURISTIC PROB MODEL - GRID
 # ======================================================================
@@ -114,46 +109,24 @@ def run_heu_model(
     requests_cont_path, 
     network_disc_path, 
     requests_disc_path,          
-    number: int,
-    horizon: int,
-    dt:int, 
-    num_modules: int,
-    num_trails: int,
-    c_km: float,
-    c_uns: float,
-    depot: int,
-    num_Nw: int,
-    z_max: int,
-    t_max: int,
-    q_min: int,
-    q_max: int,
-    Q: int,
-    alpha: float,
-    slack_min: float,
+    inst_params: dict,
+    heu_params:dict,
     seed: int,
     exp_id: str,
-    mean_edge_length_km: float,
-    mean_speed_kmh: float,
-    rel_std: float,
-    base_output_folder,     ### Folder for results
+    base_output_folder,   # Folder for results
     cplex_cfg: dict | None = None,
-    n_keep: int = 4,
-    it_out: int = 100,
-    it_in: int = 50,
-    time_out: float = 36_000,
-    n_clust: int = 4,
-    warm_start_bool: bool = False,    ### Start minirouting with warm start (=best solution so far)
+
 ) -> dict:
     """
     Euristica
     """
-    start_heu_time = time.time()
+    ### Parametri
+    n_keep = heu_params["n_keep"]    # n. nodes that are fixed after each iteration (GRIGI)
+    it_in =  heu_params["it_in"]
+    n_clust = heu_params["n_clust"]
+    warm_start_bool = heu_params["warm_start_bool"]    # Start minirouting with the best solution founded in the inner loop so far   
 
-    ### Loading of the discrete netowork and discrete request
-    with network_disc_path.open("r", encoding="utf-8") as f:
-        net_disc = json.load(f)
-    with requests_disc_path.open("r", encoding="utf-8") as f:
-        req_disc = json.load(f)
+    start_heu_time = time.time()
 
     # Full instance (with original discrete data)
     I_full = instance
@@ -171,8 +144,7 @@ def run_heu_model(
     req7d_remaining = copy.deepcopy(req7d)                  # 7D candidati GRIGI
     req_original_remaining= copy.deepcopy(req_original)    # richieste candidati GRIGI
     
-    ### Requests that were already selected in past
-    req_fixed = []        # List of dict       # richieste ROSA
+    ### Constraints that will be fixed
     fixed_constraints = {}     # Dictionary of fixed variables     # richieste ROSA
 
     ### Best global solution (for warm start)
@@ -184,20 +156,13 @@ def run_heu_model(
     ###################
     start_out_time = time.time()
     i = 0
-    while (
-          (i < it_out) and                                   # stop if too many iterations
-          (time.time() - start_out_time < time_out) and      # stop if too much time
-          (len(req_original_remaining) >= n_keep)            # stop if there are not enough requests remaining
-        ):
+    while (len(req_original_remaining) >= n_keep):            # stop if there are not enough requests remaining
         #print(f"Nel out while i: {i}")
 
         ### Select k = keep elements 
         # id GRIGI + id NERI
         selected_ids, remaining_ids = topk_ids_by_centroid_7d(req7d_remaining, n_keep)   # Selezione richieste GRIGIE 
         
-        ### Nuovi futuri fixed (GRIGI che diventeranno ROSA)
-        new_fixed_requests = [r for r in req_original_remaining if int(r["id"]) in selected_ids]
-        req_fixed.extend(new_fixed_requests) 
 
         ### Remaining requests (NERE)
         req7d_remaining = pick_by_ids(req7d_remaining, remaining_ids, key="k")       # new req7d_remaining
@@ -416,43 +381,36 @@ def run_heu_model(
 
 
     ### Results
+    inst_block = dict(inst_params)
+    inst_block["grid_nodes"] = inst_params["number"] ** 2
+
     result = {
         "exp_id": exp_id,
         "model_name": f"{model_name}_HEU_FINAL_FULL",
-        "num_Nw": I_full.num_Nw,
         "seed": seed,
-        "number": number,
-        "grid_nodes": number * number,
-        "mean_edge_length": mean_edge_length_km,
-        "mean_speed": mean_speed_kmh,
-        "std": rel_std,
-        "horizon": horizon,
-        "dt": I_full.dt,
-        "t_max": I_full.t_max,
-        "num_modules": I_full.num_modules,
-        "num_trails": I_full.num_trail_modules,
-        "z_max": I_full.Z_max,
-        "Q": I_full.Q,
-        "c_km": I_full.c_km,
-        "c_uns": I_full.c_uns,
-        "num_requests": I_full.num_requests,
-        "served": served,
-        "served_ratio": served_ratio,
-        "q_min": q_min,
-        "q_max": q_max,
-        "alpha": alpha,
-        "slack_min": slack_min,
-        "depot": I_full.depot,
-        "N_size": len(I_full.N),
-        "A_size": len(I_full.A),
-        "K_size": len(I_full.K),
-        "M_size": len(I_full.M),
-        "P_size": len(I_full.P),
+
+        # parametri istanza
+        **inst_block,
+
+        # parametri euristica (se li vuoi nel CSV)
+        "heu_n_keep": heu_params["n_keep"],
+        "heu_it_in": heu_params["it_in"],
+        "heu_n_clust": heu_params["n_clust"],
+        "heu_warm_start": bool(heu_params["warm_start_bool"]),
+
+        # risultati modello finale
         "status": status,
         "objective": objective,
         "mip_gap": mip_gap,
         "solve_time_sec": solve_time,
         "total_time_sec": total_time,
+        "served": served,
+        "served_ratio": served_ratio,
+
+        # tempo totale euristica (utile)
+        "heu_total_time_sec": end_heu_time - start_heu_time,
+
+        # output folder/path (minimo indispensabile)
         "output_folder": str(output_folder),
         "network_path": str(network_disc_path),
         "requests_path": str(requests_disc_path),

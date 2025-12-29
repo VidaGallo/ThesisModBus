@@ -14,66 +14,45 @@ import time
 #  BUILD INSTANCE - GRID (ASYMMETRIC)
 # ======================================================================
 def build_instance_and_paths(
-    number: int,
-    horizon: int,
-    dt: int,
-    num_modules: int,
-    num_trails: int,       # |P|
-    Q: int,
-    c_km: float,
-    c_uns: float,   
-    num_requests: int,
-    q_min: int,
-    q_max: int,
-    slack_min: float,
-    depot: int,
+    inst_params: dict,
     seed: int,
-    num_Nw: int,
-    mean_edge_length_km: float,
-    mean_speed_kmh: float,
-    rel_std: float,
-    z_max: int | None = None,
-    alpha: float = 0.65,
 ):
     """
     Generate the asymmetric GRID network and the requests, then build Instance.
     """
 
-    t_max = horizon // dt
+    t_max = inst_params["horizon"] // inst_params["dt"]
 
     # Generating asym grid
     network_cont_path, requests_cont_path, network_path, requests_path = generate_all_data_asym(
-        number=number,
-        horizon=horizon,
-        dt=dt,
-        num_requests=num_requests,
-        q_min=q_min,
-        q_max=q_max,
-        slack_min=slack_min,
-        depot=depot,
-        mean_edge_length_km=mean_edge_length_km,
-        mean_speed_kmh=mean_speed_kmh,
-        rel_std=rel_std,
-        alpha=alpha,
+        number = inst_params["number"],
+        horizon = inst_params["horizon"],
+        dt = inst_params["dt"],
+        num_requests = inst_params["num_requests"],
+        q_min = inst_params["q_min"],
+        q_max = inst_params["q_max"],
+        slack_min = inst_params["slack_min"],
+        depot = inst_params["depot"],
+        mean_edge_length_km = inst_params["mean_edge_length_km"],
+        mean_speed_kmh = inst_params["mean_speed_kmh"],
+        rel_std = inst_params["rel_std"],
+        alpha = inst_params["alpha"],
         seed=seed
     )
-
-
     instance = load_instance_discrete(
-        network_path=network_path,
-        requests_path=requests_path,
-        dt=dt,
-        t_max=t_max,
-        num_modules=num_modules,
-        num_trail=num_trails,
-        Q=Q,
-        c_km=c_km,
-        c_uns=c_uns,
-        depot=depot,
-        num_Nw=num_Nw,      # first N by degree
-        z_max=z_max
+        network_path = network_path,
+        requests_path = requests_path,
+        dt = inst_params["dt"],
+        t_max = t_max,
+        num_modules = inst_params["num_modules"],
+        num_trail = inst_params["num_trails"],
+        Q = inst_params["Q"],
+        c_km = inst_params["c_km"],
+        c_uns = inst_params["c_uns"],
+        depot = inst_params["depot"],
+        num_Nw = inst_params["num_Nw"],      # first N by degree
+        z_max = inst_params.get("z_max")
     )
-
     return instance, network_cont_path, requests_cont_path, network_path, requests_path, t_max
 
 
@@ -82,6 +61,7 @@ def build_instance_and_paths(
 # ======================================================================
 #  BUILD INSTANCE - CITY
 # ======================================================================
+""" DA FINIRE """
 def build_instance_and_paths_city(
     city: str,                    # city name
     subdir: str,                  # subdirectory name
@@ -147,25 +127,17 @@ def build_instance_and_paths_city(
 
 
 
+
+
 # ======================================================================
 #  RUN SINGLE MODEL - GRID
 # ======================================================================
 def run_single_model(
     instance: Instance,
     model_name: str,
-    network_path,
-    requests_path,
-    number: int,
-    horizon: int,
-    q_min: int,
-    q_max: int,
-    alpha: float,
-    slack_min: float,
+    inst_params: dict,
     seed: int,
     exp_id: str,
-    mean_edge_length_km: float,
-    mean_speed_kmh: float,
-    rel_std: float,
     base_output_folder,   
     cplex_cfg: dict | None = None,
 
@@ -284,56 +256,25 @@ def run_single_model(
     # ----------------
     # Dizionario risultato
     # ----------------
+    inst_block = dict(inst_params)
+    inst_block["grid_nodes"] = inst_params["number"] ** 2 
+
     result = {
-        # identificazione esperimento + modello
         "exp_id": exp_id,
         "model_name": model_name,
-        "num_Nw": instance.num_Nw,
-
-        # --- experiment data ---
         "seed": seed,
-        "number": number,
-        "grid_nodes": number * number,
-        "mean_edge_length": mean_edge_length_km,
-        "mean_speed": mean_speed_kmh,
-        "std": rel_std,
-        "horizon": horizon,
-        "dt": instance.dt,
-        "t_max": instance.t_max,
-        "num_modules": instance.num_modules,
-        "num_trails": instance.num_trail_modules,
-        "z_max": instance.Z_max,
-        "Q": instance.Q,
-        "c_km": instance.c_km,
-        "c_uns": instance.c_uns,
-        "num_requests": instance.num_requests,
-        "served": served,
-        "served_ratio": served_ratio,
-        "q_min": q_min,
-        "q_max": q_max,
-        "alpha": alpha,
-        "slack_min": slack_min,
-        "depot": instance.depot,
 
+        # parametri istanza 
+        **inst_block,
 
-        # --- instance sizes ---
-        "N_size": len(instance.N),
-        "A_size": len(instance.A),
-        "K_size": len(instance.K),
-        "M_size": len(instance.M),
-        "P_size": len(instance.P),
-
-        # --- solver output ---
+        # risultati modello
         "status": status,
         "objective": objective,
         "mip_gap": mip_gap,
         "solve_time_sec": solve_time,
         "total_time_sec": total_time,
-
-        # --- paths ---
-        "output_folder": str(output_folder),
-        "network_path": str(network_path),
-        "requests_path": str(requests_path),
+        "served": served,
+        "served_ratio": served_ratio,
     }
 
     return result
@@ -344,6 +285,7 @@ def run_single_model(
 # ======================================================================
 #  RUN SINGLE MODEL - CITY
 # ======================================================================
+""" DA FINIRE """
 def run_single_model_city(
     city: str,
     instance: Instance,

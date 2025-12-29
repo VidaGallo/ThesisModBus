@@ -114,7 +114,7 @@ class Instance:
         return len(self.P)
 
     @property
-    def Z_max(self) -> int:
+    def z_max_eff(self) -> int:
         """
         Numero massimo di TRAIL agganciabili a un MAIN.
         """

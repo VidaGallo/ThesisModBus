@@ -83,7 +83,7 @@ def create_decision_variables_w(mdl: Model, I: Instance):
     )
 
 
-    Z_max = I.Z_max
+    Z_max = I.z_max_eff
     P = I.P
 
     # D[m,i,t] = n° TRAIL rilasciati dal MAIN m nel nodo i al tempo t
@@ -150,7 +150,7 @@ def add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
     Nw = I.Nw
     A = I.A
     M = I.M
-    Z_max = I.Z_max
+    Z_max = I.z_max_eff
     P = I.P
     K = I.K
     T = I.T
@@ -193,7 +193,7 @@ def add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
     #    ...
     # ------------------------------------------------------------------ 
     # Nessun MAIN può avere più di Z_max moduli TRAIL:
-    Z_max = I.Z_max
+    Z_max = I.z_max_eff
     for m in M:
         for t in T:
             mdl.add_constraint(
@@ -296,7 +296,7 @@ def add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
     # 5) SCAMBIO MODULI TRAIL (D, U, z, kappa)
     # ------------------------------------------------------------------
     
-    Z_max = I.Z_max
+    Z_max = I.z_max_eff
     t0 = T[0]
 
     # 5.1) Lo scambio può avvenire solo se si ha qualche TRAIL da scambiare
