@@ -25,6 +25,7 @@ from .time_discretization import *
 import random
 import numpy as np
 import hashlib
+import json
 from datetime import datetime
 
 
@@ -42,6 +43,9 @@ def set_seed(seed: int) -> random.Random:
 
 
 ### To create a HASH of the instance (in order to not repeat instances generation unecessarly)
+
+GENERATOR_VERSION = "v1"   # To change if there are some changes made in the functions!!!
+
 def canonical_dumps(d: dict) -> str:
     return json.dumps(d, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
@@ -53,6 +57,11 @@ def write_meta(base: Path, meta: dict) -> None:
     meta = dict(meta)
     meta["created_at"] = datetime.now().isoformat(timespec="seconds")
     (base / "meta.json").write_text(json.dumps(meta, indent=2, sort_keys=True), encoding="utf-8")
+
+def maybe_skip_existing(base: Path) -> bool:  # If there a file already exists no need to do it again
+    return (base / "meta.json").exists()
+
+
 
 
 
@@ -80,21 +89,47 @@ def generate_all_data(
     """
     rng = set_seed(seed)
 
+    ### HASH GENERATION
+    params = dict(
+        dataset="GRID",
+        seed=seed,
+        number=number,
+        horizon=horizon,
+        dt=dt,
+        num_requests=num_requests,
+        q_min=q_min,
+        q_max=q_max,
+        slack_min=slack_min,
+        depot=depot,
+        mean_edge_length_km=mean_edge_length_km,
+        mean_speed_kmh=mean_speed_kmh,
+        alpha=alpha,
+        generator_version=GENERATOR_VERSION,
+    )
+    h = make_hash(params)
+
+
     ### BUILD FOLDER
     base = (
         Path("instances")
         / "GRID"
         / f"{number}x{number}"
-        / f"seed{seed}_v{mean_speed_kmh}_h{horizon}_K{num_requests}_sl{slack_min}_dt{dt}"
+        / f"{h}_seed{seed}_H{horizon}_dt{dt}_K{num_requests}"
     )
     base.mkdir(parents=True, exist_ok=True)
 
     network_cont  = base / "network.json"
     requests_cont = base / "requests.json"
-    network_disc  = base / f"network_disc{dt}min.json"
-    requests_disc = base / f"requests_disc{dt}min.json"
+    network_disc  = base / f"network_disc_dt={dt}.json"
+    requests_disc = base / f"requests_disc_dt={dt}.json"
 
 
+
+    # Se l'istanza è già stata generata in passato
+    if maybe_skip_existing(base):
+        return network_cont, requests_cont, network_disc, requests_disc
+
+    
     ### GENERATE CONTINUOUS NETWORK + SAVING
     generate_grid_network(
         output_path=network_cont, 
@@ -134,6 +169,8 @@ def generate_all_data(
         depot=depot,                      # to check τ depot→origin discrete
     )
 
+    write_meta(base, {"hash": h, "params": params})   # Si segna la generazione dell'istanza
+
     # Return paths
     return network_cont, requests_cont, network_disc, requests_disc
 
@@ -164,19 +201,44 @@ def generate_all_data_asym(
     """
     rng = set_seed(seed)
 
+    ### HASH GENERATION
+    params = dict(
+        dataset="GRID_ASYM",
+        seed=seed,
+        number=number,
+        horizon=horizon,
+        dt=dt,
+        num_requests=num_requests,
+        q_min=q_min,
+        q_max=q_max,
+        slack_min=slack_min,
+        depot=depot,
+        mean_edge_length_km=mean_edge_length_km,
+        mean_speed_kmh=mean_speed_kmh,
+        rel_std=rel_std,
+        alpha=alpha,
+        generator_version=GENERATOR_VERSION,
+    )
+    h = make_hash(params)
+
     ### BUILD FOLDER
     base = (
         Path("instances")
         / "GRID_ASYM"
         / f"{number}x{number}"
-        / f"seed{seed}_v{mean_speed_kmh}_h{horizon}_K{num_requests}_sl{slack_min}_dt{dt}"
+        / f"{h}_seed{seed}_H{horizon}_dt{dt}_K{num_requests}"
     )
     base.mkdir(parents=True, exist_ok=True)
 
     network_cont  = base / "network.json"
     requests_cont = base / "requests.json"
-    network_disc  = base / f"network_disc{dt}min.json"
-    requests_disc = base / f"requests_disc{dt}min.json"
+    network_disc  = base / f"network_disc_dt={dt}.json"
+    requests_disc = base / f"requests_disc_dt={dt}.json"
+
+
+    # Se l'istanza è già stata generata in passato non serve ricrearla
+    if maybe_skip_existing(base):
+        return network_cont, requests_cont, network_disc, requests_disc
 
 
     ### GENERATE CONTINUOUS NETWORK + SAVING
@@ -221,6 +283,7 @@ def generate_all_data_asym(
         depot=depot,                      # to check τ depot→origin discrete
     )
 
+    write_meta(base, {"hash": h, "params": params})   # Si segna la generazione dell'istanza
 
     # Return paths
     return network_cont, requests_cont, network_disc, requests_disc
@@ -252,6 +315,25 @@ def generate_all_data_city(
     """
     rng = set_seed(seed)
 
+    ### HASH GENERATION
+    params = dict(
+        dataset="CITY",
+        city=city,
+        central_suburbs=sorted(list(central_suburbs)),  # ordine deterministico
+        seed=seed,
+        horizon=horizon,
+        dt=dt,
+        num_requests=num_requests,
+        q_min=q_min,
+        q_max=q_max,
+        slack_min=slack_min,
+        depot=depot,
+        mean_speed_kmh=mean_speed_kmh,
+        alpha=alpha,
+        generator_version=GENERATOR_VERSION,
+    )
+    h = make_hash(params)
+
     ### BUILD FOLDER
     city_slug = (
         city.lower()
@@ -264,14 +346,18 @@ def generate_all_data_city(
         / "CITY"
         / subdir
         / city_slug
-        / f"seed{seed}_v{mean_speed_kmh}_h{horizon}_K{num_requests}_sl{slack_min}_dt{dt}"
+        / f"{h}_seed{seed}_H{horizon}_dt{dt}_K{num_requests}"
     )
     base.mkdir(parents=True, exist_ok=True)
 
     network_cont  = base / "network.json"
     requests_cont = base / "requests.json"
-    network_disc  = base / f"network_disc{dt}min.json"
-    requests_disc = base / f"requests_disc{dt}min.json"
+    network_disc  = base / f"network_disc_dt={dt}.json"
+    requests_disc = base / f"requests_disc_dt={dt}.json"
+
+    # Se l'istanza è già stata generata in passato
+    if maybe_skip_existing(base):
+        return network_cont, requests_cont, network_disc, requests_disc
 
 
     ### GENERATE CONTINUOUS NETWORK + SAVING
@@ -313,7 +399,7 @@ def generate_all_data_city(
         depot=depot,                      # to check τ depot→origin discrete
     )
 
-
+    write_meta(base, {"hash": h, "params": params})   # Si segna la generazione dell'istanza
 
     # Return paths
     return network_cont, requests_cont, network_disc, requests_disc

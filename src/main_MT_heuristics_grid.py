@@ -3,17 +3,24 @@ from utils.runs_heu_fun import *
 import random, numpy as np, pandas as pd
 from pathlib import Path
 
-RUN_EXACT = True
-RUN_HEUR  = True
 
 def set_seed(seed: int):
     random.seed(seed); np.random.seed(seed)
 
 
-CPLEX_CFG = {
+CPLEX_CFG_SLOW = {
     "time_limit": 36_000,     # seconds
-    "mip_gap": 0.1,          # relative MIP gap, 0.01 = 1%
-    "abs_mip_gap": 1e-6,      # absolute MIP gap
+    "mip_gap": 0.1,           # relative MIP gap, 0.1 = 10%
+    "abs_mip_gap": 0.1,       # absolute MIP gap, accetta differenza di ±0.1
+    "threads": 0,             # 0 = all available threads
+    "mip_display": 1,         # 0..5 (2 = default)
+    "emphasis_mip": 2,        # 0 balanced, 1 feasibility, 2 optimality, ...
+    "parallel": 0             # 0 auto, 1 opportunistic, 2 deterministic
+}
+CPLEX_CFG_FAST = {
+    "time_limit": 600,        # seconds
+    "mip_gap": 0.5,           # relative MIP gap, 0.5 = 50%
+    "abs_mip_gap": 1,         # absolute MIP gap, accetta differenza di ±1
     "threads": 0,             # 0 = all available threads
     "mip_display": 1,         # 0..5 (2 = default)
     "emphasis_mip": 2,        # 0 balanced, 1 feasibility, 2 optimality, ...
@@ -21,16 +28,25 @@ CPLEX_CFG = {
 }
 
 
+####################################
+RUN_EXACT = True
+RUN_HEUR  = True
+WARM_START = True
+
+CPLEX_CFG_EXACT = CPLEX_CFG_SLOW
+CPLEX_CFG_HEURISTIC = CPLEX_CFG_SLOW
+####################################
+
 if __name__ == "__main__":
     seed = 23
     set_seed(seed)
 
     # params...
     number = 3    # side grid
-    horizon =120
+    horizon = 90
     dt = 5
     depot = 0
-    num_requests = 15
+    num_requests = 5
     q_min, q_max = 1, 10
     alpha = 0.65
     slack_min = 20.0
@@ -91,7 +107,7 @@ if __name__ == "__main__":
             mean_speed_kmh=mean_speed_kmh,
             rel_std=rel_std,
             base_output_folder=paths["exact"],
-            cplex_cfg=CPLEX_CFG,
+            cplex_cfg=CPLEX_CFG_EXACT,
         )
         pd.DataFrame([res_exact]).to_csv(paths["summary"]/ "summary_exact.csv", index=False)
         exact_end = time.time()
@@ -125,12 +141,13 @@ if __name__ == "__main__":
             mean_speed_kmh=mean_speed_kmh,
             rel_std=rel_std,
             base_output_folder=paths["heur"],
-            cplex_cfg=CPLEX_CFG,
+            cplex_cfg=CPLEX_CFG_HEURISTIC,
             n_keep = 4,
             it_out = 1000,   # <- usually stop earlier after fixing all the requests
             it_in = 20,
             time_out = 36_000,
-            n_clust = 4
+            n_clust = 4,
+            warm_start_bool = WARM_START    # Start minirouting with the best solution founded in the inner loop so far
         )
         pd.DataFrame([res_heu]).to_csv(paths["summary"]/ "summary_heur.csv", index=False)
         heu_end = time.time()
@@ -166,8 +183,8 @@ if RUN_EXACT and RUN_HEUR:
             f"EXACT = {res_exact['objective']:.3f}, "
             f"HEUR = {res_heu['objective']:.3f}"
         )
-    print(f"RELATIVE GAP (HEUR vs EXACT): {gap:+.2f}%")
+    print(f"RELATIVE GAP (HEUR vs EXACT): {gap:.2f}%")
     print("\n")
     dt_abs = abs(heu_time - exact_time)
     print(f"exact = {exact_time:.2f}s, heuristic = {heu_time:.2f}")
-    print(f"TIME DIFF (HEUR vs EXACT): {dt_abs:+.2f}%")
+    print(f"TIME DIFF (HEUR vs EXACT): {dt_abs:.2f}%")

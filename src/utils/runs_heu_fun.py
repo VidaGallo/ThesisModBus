@@ -24,6 +24,8 @@ def mini_routing(
     labels_PD: Optional[Dict[tuple[int, str], int]],              # {(k,"P"/"D"): cluster or -1}
     base_model,
     base_var_dicts,
+    warm_start_bool: bool = False,
+    mip_start: Optional[Dict[str, float]] = None,   # Partial solution proposal (for warm start)
     infeas_value: float = 1e100,
 ) -> Tuple[Dict[str, Dict[tuple, float]], float]:
     """
@@ -42,6 +44,11 @@ def mini_routing(
 
     a = var_dicts["a"]
     b = var_dicts["b"]
+
+    # apply mip start (warm start)
+    if mip_start and warm_start_bool:    # If we have a warmup solution and we want to use it
+        n = add_mip_start_by_name(model, mip_start)  
+        #print(n)
 
 
     # -------------------------
@@ -65,13 +72,13 @@ def mini_routing(
                                                   active_ids=active_ks,
                                                   name="cl_mod",
                                                   )
-    
+
     # -------
     # Solve
     # -------
     sol = model.solve(log_output=False)
     if sol is None:   # Soluzione infeasable
-        return fixed_constr, infeas_value    
+        return fixed_constr, infeas_value, None    
 
     obj = float(sol.objective_value)
 
@@ -81,7 +88,13 @@ def mini_routing(
     new_fixed_constr = extract_solution_values_only_selected_k_ab(var_dicts, sol, future_fixed_ids)
     updated_fixed_constr = merge_constraints_ab(fixed_constr, new_fixed_constr, check_conflict=True)
 
-    return updated_fixed_constr, obj
+    if warm_start_bool:
+        start_for_next = extract_mip_start_by_name(sol, var_dicts)
+        return updated_fixed_constr, obj, start_for_next
+    else:   # No saving of the solution required
+        return updated_fixed_constr, obj, None
+
+    
 
                 
 
@@ -129,6 +142,7 @@ def run_heu_model(
     it_in: int = 50,
     time_out: float = 36_000,
     n_clust: int = 4,
+    warm_start_bool: bool = False,    ### Start minirouting with warm start (=best solution so far)
 ) -> dict:
     """
     Euristica
@@ -161,7 +175,10 @@ def run_heu_model(
     req_fixed = []        # List of dict       # richieste ROSA
     fixed_constraints = {}     # Dictionary of fixed variables     # richieste ROSA
 
-    
+    ### Best global solution (for warm start)
+    best_global_warmup_sol = None   
+    best_global_warmup_obj = 1e100
+
     ###################
     ### OUTER WHILE ###
     ###################
@@ -197,7 +214,8 @@ def run_heu_model(
         j = 0
         obj_f_best = 1e100    # Best obj.f. up to now
         best_candidate_constraints = None     # Dictionary with old + new constraints     # ROSA + GRIGI
-        
+        best_candidate_warmup_sol = None
+
         p_insodd = 0.9   # Theta start for this round of GP
         diff = p_insodd / max(it_in, 1)
         
@@ -232,47 +250,55 @@ def run_heu_model(
                 continue
             seen_signatures.add(sig_hash)
 
+
             ### Mini Routing to obtain new candidate cosntraints + obj_f
-            candidate_constraints, candidate_obj_f = mini_routing(
+
+            candidate_constraints, candidate_obj_f, candidate_solution = mini_routing(
                 instance=I_full,
-                future_fixed_ids=selected_ids,       # requests that will have fixed constraints in the future
-                clustered_ids=remaining_ids,         # ID of the requests that were clsutered
-                fixed_constr=fixed_constraints,      # cosntraints già decise in passato (richieste ROSA)
-                labels_PD=labels_PD_events,          # CLUSTERIZZAZIONE
-                base_model=base_model,               # base model with FIXED CONSTRAINTS
+                future_fixed_ids=selected_ids,         # requests that will have fixed constraints in the future
+                clustered_ids=remaining_ids,           # ID of the requests that were clsutered
+                fixed_constr=fixed_constraints,        # cosntraints già decise in passato (richieste ROSA)
+                mip_start=best_candidate_warmup_sol,   # best partial solution so far
+                warm_start_bool = warm_start_bool,      # use or not warm start
+                labels_PD=labels_PD_events,            # CLUSTERIZZAZIONE
+                base_model=base_model,                 # base model with FIXED CONSTRAINTS
                 base_var_dicts=base_var_dicts,
             )
               
 
-            print(f"Inner while, j={j}, f.obj={candidate_obj_f}")
+            print(f"-Inner while, j={j}, f.obj={candidate_obj_f}")
 
-
+            ### Inner while best
             if candidate_obj_f < obj_f_best:   # We have an improvement
                 obj_f_best = candidate_obj_f    # A new better solution
                 best_candidate_constraints = copy.deepcopy(candidate_constraints)    # Save the new better constraints
+                best_candidate_warmup_sol = copy.deepcopy(candidate_solution)    # Solution for warmup
                 no_improve = 0
             else:
                 no_improve += 1
                 
-            
             j += 1   # j++
         
     
 
         stop_in_time =  time.time()
-        print(f"END In while, j = {j}, f_obj = {obj_f_best}, time = {stop_in_time - start_in_time}")
+        print(f"END Inner while, j = {j}, f_obj = {obj_f_best}, time = {stop_in_time - start_in_time}")
 
 
         if best_candidate_constraints is None:
             best_candidate_constraints = copy.deepcopy(fixed_constraints)
         fixed_constraints = copy.deepcopy(best_candidate_constraints)     ### Queste constriant saranno fissate in futuro (ROSA)
         
+        ### Global best (for warm start)
+        if obj_f_best < best_global_warmup_obj:
+            best_global_warmup_obj = obj_f_best
+            best_global_warmup_sol = best_candidate_warmup_sol   
+
         i += 1  # i++
         print(f"Outer while, i={i}, f.obj={obj_f_best}")
-        print("\n")
 
     stop_out_time =  time.time()
-    print(f"END Out while, i = {i}, time = {stop_out_time - start_out_time}")
+    print(f"END Outter while, i = {i}, time = {stop_out_time - start_out_time}")
     print("\n")
 
 
@@ -306,7 +332,12 @@ def run_heu_model(
     if fixed_constraints:   
         fix_constraints_ab(model_final, var_dicts, fixed_constraints)
 
-    # Solve the full model 
+    ### Apply warm start
+    if best_global_warmup_sol and warm_start_bool:    # We have a warmup solution and we want to use it
+        n = add_mip_start_by_name(model_final, best_global_warmup_sol)  
+        #print(n)
+
+    ### Solve the full model 
     t_start_solve = time.perf_counter()
     solution = model_final.solve(log_output=False)
     solve_time = time.perf_counter() - t_start_solve

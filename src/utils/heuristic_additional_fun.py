@@ -632,3 +632,78 @@ def map_vars_by_name(model, base_var_dicts):
                 raise KeyError(f"Var not found in clone: fam={fam}, key={key}, name={var.name}")
             mapped[fam][key] = v2
     return mapped
+
+
+
+
+### Adatta la soluzione warmup al nuovo modello
+def add_mip_start_by_name(model, start_by_name: dict | None):
+    """
+    Crea una SolveSolution (docplex) con i valori e la passa a add_mip_start().
+    Ritorna quante variabili sono state impostate.
+    """
+    if not start_by_name:
+        return 0
+
+    sol = model.new_solution()   # SolveSolution legata a questo model
+    n = 0
+
+    for name, val in start_by_name.items():
+        v = model.get_var_by_name(name)
+        if v is None:
+            continue
+        sol.add_var_value(v, val)
+        n += 1
+
+    if n > 0:
+        model.add_mip_start(sol)   # <-- qui ora è un oggetto Solution, non dict
+    return n
+
+
+
+### Funzione per estrarre soluzioni parziali 
+def extract_mip_start_by_name(sol, var_dicts, thr=0.5):
+    """
+    Ritorna dict {var_name: value} valido per rimappare su qualunque clone
+    che contenga variabili con gli stessi nomi.
+    """
+    if sol is None:
+        return None
+
+    fams_bin = ("x", "y")
+    fams_int = ("D", "U", "z", "kappa") 
+
+    start = {}
+
+    for fam in fams_bin:
+        V = var_dicts.get(fam)
+        if not V:
+            continue
+        for var in V.values():
+            val = sol.get_value(var)
+            if val is None:
+                continue
+            start[var.name] = 1 if float(val) >= thr else 0
+
+    for fam in fams_int:
+        V = var_dicts.get(fam)
+        if not V:
+            continue
+        for var in V.values():
+            val = sol.get_value(var)
+            if val is None:
+                continue
+            v = int(round(float(val)))
+            lb = getattr(var, "lb", None)
+            ub = getattr(var, "ub", None)
+            if lb is not None:
+                v = max(v, int(lb))
+            if ub is not None:
+                v = min(v, int(ub))
+            start[var.name] = v
+
+    return start
+
+
+
+
