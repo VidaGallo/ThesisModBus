@@ -1,5 +1,5 @@
 from utils.runs_fun import *
-from utils.runs_heu_fun import *
+from utils.runs_heu_GP_fun import *
 import random, numpy as np, pandas as pd
 from pathlib import Path
 
@@ -29,7 +29,7 @@ CPLEX_CFG_FAST = {
 
 
 ####################################
-RUN_EXACT = True
+RUN_EXACT = False
 RUN_HEUR  = True
 WARM_START = True
 
@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
     # params...
     number = 3    # side grid
-    horizon = 90
+    horizon = 60
     dt = 5
     depot = 0
     num_requests = 5
