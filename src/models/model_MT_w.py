@@ -22,9 +22,16 @@ def create_decision_variables_w(mdl: Model, I: Instance):
     )
 
     # y[m,i,j,t]
+    t_max = I.T[-1]
     y = mdl.binary_var_dict(
-        keys=[(m, i, j, t) for m in M for (i, j) in A for t in T],
-        name="y"
+    keys=[
+        (m, i, j, t)
+        for m in I.M
+        for (i, j) in I.A
+        for t in I.T
+        if t + I.tau_arc[(i, j)] <= t_max
+    ],
+    name="y"
     )
 
     # r[k,t,m], only for t ∈ ΔT_k
@@ -126,9 +133,9 @@ def create_decision_variables_w(mdl: Model, I: Instance):
         name="kappa"
     )
 
-    # h[m,i,j,t] or h[i,j,t]
+    # h[m,i,j,t] 
     h = mdl.integer_var_dict(
-        keys=[(m, i, j, t) for m in M for (i, j) in A for t in T],
+        keys=list(y.keys()),   # STESSE chiavi di y
         lb=0,
         ub=Z_max+1,
         name="h"
@@ -182,10 +189,11 @@ def add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
         mdl.sum(z[m, t0] for m in M) + mdl.sum(kappa[i, t0] for i in Nw) == len(P),
         ctname="initial_trail_attached_t0"
     )
-    mdl.add_constraint(
-        mdl.sum(kappa[i, t0] for i in Nw) == 0,
-        ctname="initial_trail_stock_zero"
-    )
+    # Opzionale
+    #mdl.add_constraint(
+    #    mdl.sum(kappa[i, t0] for i in Nw) == 0,
+    #    ctname="initial_trail_stock_zero"
+    #)
 
 
     # ------------------------------------------------------------------
@@ -227,7 +235,11 @@ def add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
                 continue
             for t in T:
                 mdl.add_constraint(
-                    mdl.sum(y[m, i, j, t] for (i2,j) in outgoing) <= x[m, i, t],
+                    mdl.sum(
+                        y[m, i, j, t]
+                        for (i2, j) in outgoing
+                        if (m, i, j, t) in y     ### no y fuori orizzonte temporale
+                    ) <= x[m, i, t],
                     ctname=f"one_departure_m{m}_i{i}_t{t}"
                 )
 
@@ -244,31 +256,32 @@ def add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
     # ------------------------------------------------------------------
     for m in M:
         for i in N:
-            outgoing = [ (u,v) for (u,v) in A if u == i ]
-            incoming = [ (hh,v) for (hh,v) in A if v == i ]
+            outgoing = [(u,v) for (u,v) in A if u == i]
+            incoming = [(h,v) for (h,v) in A if v == i]
 
-            for t in T_pos:   # t > t0
-                lhs = x[m, i, t]
-
-                # x[m,i,t-1]
+            for t in T_pos:
                 rhs = x[m, i, t-1]
 
-                # - sum_{j:(i,j)∈A} y[m,i,j,t-1]
+                # uscite al tempo t-1
                 if outgoing:
-                    rhs -= mdl.sum(y[m, i, j, t-1] for (i2,j) in outgoing)
+                    rhs -= mdl.sum(
+                        y[m, i, j, t-1]
+                        for (i2, j) in outgoing    ### no y fuori da orizzonte temporale
+                        if (m, i, j, t-1) in y
+                    )
 
-                # + sum_{h:(h,i)∈A, t - tau(h,i) >= t0} y[m,h,i,t - tau(h,i)]
+                # entrate che arrivano esattamente in (i,t)
                 incoming_terms = []
-                for (hh, i2) in incoming:
-                    travel = tau[(hh, i)]
-                    t_depart = t - travel
-                    if t_depart >= t0:
+                for (hh, _) in incoming:
+                    t_depart = t - tau[(hh, i)]
+                    if t_depart >= t0 and (m, hh, i, t_depart) in y:
                         incoming_terms.append(y[m, hh, i, t_depart])
+
                 if incoming_terms:
                     rhs += mdl.sum(incoming_terms)
 
                 mdl.add_constraint(
-                    lhs == rhs,
+                    x[m, i, t] == rhs,
                     ctname=f"move_consistency_m{m}_i{i}_t{t}"
                 )
 
@@ -295,19 +308,18 @@ def add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
     # ------------------------------------------------------------------
     # 5) SCAMBIO MODULI TRAIL (D, U, z, kappa)
     # ------------------------------------------------------------------
-    
     Z_max = I.z_max_eff
     t0 = T[0]
 
     # 5.1) Lo scambio può avvenire solo se si ha qualche TRAIL da scambiare
-    #    D^m_{i,t} <= z^m_t              ∀ m∈M, i∈Nw, t∈T \ {t0}
+    #    D^m_{i,t} <= z^m_(t-1)              ∀ m∈M, i∈Nw, t∈T \ {t0}
     for m in M:
         for t in T:
             if t == t0:
                 continue
             for i in Nw:
                 mdl.add_constraint(
-                    D[m, i, t] <= z[m, t],
+                    D[m, i, t] <= z[m, t-1],
                     ctname=f"D_le_z_m{m}_i{i}_t{t}"
                 )
 
@@ -338,15 +350,15 @@ def add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
     # 5.4) Conservazione scambio TRAIL nel nodo:
     #    ∑_m U^m_{i,t} <= ∑_m D^m_{i,t} + κ_{i,t-1}
     #    ∀ i∈Nw, t∈T \ {t0}
-    for i in Nw:
-        for t in T:
-            if t == t0:
-                continue
-            mdl.add_constraint(
-                mdl.sum(U[m, i, t] for m in M)
-                <= mdl.sum(D[m, i, t] for m in M) + kappa[i, t-1],
-                ctname=f"trail_conservation_node_i{i}_t{t}"
-            )
+    #for i in Nw:
+    #    for t in T:
+    #        if t == t0:
+    #            continue
+    #        mdl.add_constraint(
+    #            mdl.sum(U[m, i, t] for m in M)
+    #            <= mdl.sum(D[m, i, t] for m in M) + kappa[i, t-1],
+    #            ctname=f"trail_conservation_node_i{i}_t{t}"
+    #        )
 
     # 5.5) Dinamica di z^m_t:
     #    z^m_t = z^m_{t-1} - ∑_{i∈Nw} D^m_{i,t} + ∑_{i∈Nw} U^m_{i,t}
@@ -671,33 +683,24 @@ def add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
                     b[k, t, m] <= r[k, t_prev, m],
                     ctname=f"b_prev_state_k{k}_t{t}_m{m}"
                 )
+
     # ------------------------------------------------------------------
     # 11) Linearization h[m,i,j,t]
     # ------------------------------------------------------------------ 
     # h[m,i,j,t] <= (Z_max + 1) * y[m,i,j,t]
-    for m in M:
-        for (i, j) in A:
-            for t in T:
-                mdl.add_constraint(
-                    h[m, i, j, t] <= (Z_max + 1) * y[m, i, j, t],
-                    ctname=f"h_le_bigM_y_m{m}_i{i}_j{j}_t{t}"
-                )
-    # h[m,i,j,t] <= z[m,t] + 1
-    for m in M:
-        for (i, j) in A:
-            for t in T:
-                mdl.add_constraint(
-                    h[m, i, j, t] <= z[m, t] + 1,
-                    ctname=f"h_le_zplus1_m{m}_i{i}_j{j}_t{t}"
-                )
-    # h[m,i,j,t] >= (z[m,t] + 1) - (Z_max + 1) * (1 - y[m,i,j,t])
-    for m in M:
-        for (i, j) in A:
-            for t in T:
-                mdl.add_constraint(
-                    h[m, i, j, t] >= (z[m, t] + 1) - (Z_max + 1) * (1 - y[m, i, j, t]),
-                    ctname=f"h_ge_zplus1_bigM_m{m}_i{i}_j{j}_t{t}"
-                )
+    for (m, i, j, t) in y.keys():   # oppure h.keys(), sono uguali
+        mdl.add_constraint(
+            h[m, i, j, t] <= (Z_max + 1) * y[m, i, j, t],
+            ctname=f"h_le_bigM_y_m{m}_i{i}_j{j}_t{t}"
+        )
+        mdl.add_constraint(
+            h[m, i, j, t] <= z[m, t] + 1,
+            ctname=f"h_le_zplus1_m{m}_i{i}_j{j}_t{t}"
+        )
+        mdl.add_constraint(
+            h[m, i, j, t] >= (z[m, t] + 1) - (Z_max + 1) * (1 - y[m, i, j, t]),
+            ctname=f"h_ge_zplus1_bigM_m{m}_i{i}_j{j}_t{t}"
+        )
 
 
 
@@ -726,9 +729,7 @@ def add_taxi_like_objective_w(mdl, I, h, s):
     # -------------------------
     C_oper = I.c_km * mdl.sum(
         I.gamma[(i, j)] * h[m, i, j, t]
-        for m in I.M
-        for (i, j) in I.A
-        for t in I.T
+        for (m, i, j, t) in h.keys()    ### No per archi fuori t_max
     )
 
     # -------------------------

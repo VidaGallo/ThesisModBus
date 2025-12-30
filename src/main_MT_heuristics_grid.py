@@ -36,7 +36,7 @@ CPLEX_CFG_LOW_PRECISION = {
 
 #### GLOBAL PARAMETERS
 RUN_EXACT = True
-RUN_HEUR  = True
+RUN_HEUR  = False
 WARM_START = True
 
 CPLEX_CFG_EXACT = CPLEX_CFG_HIGH_PRECISION
@@ -46,7 +46,7 @@ CPLEX_CFG_HEURISTIC = CPLEX_CFG_LOW_PRECISION
 
 
 if __name__ == "__main__":
-    seed = 23
+    seed = 123
     set_seed(seed)
 
     ### MODEL NAME
@@ -62,11 +62,11 @@ if __name__ == "__main__":
         "rel_std": 0.66,      # std for arch length
 
         # domanda
-        "num_requests": 10,
+        "num_requests": 6,
         "q_min": 1,
-        "q_max": 10,
+        "q_max": 30,
         "slack_min": 20.0,
-        "alpha":  0.65,     # parameter for the distribution of the demand
+        "alpha":  0.123,     # parameter for the distribution of the demand (high => fast exp decay, low => almost uniform)
 
         # flotta / capacità
         "num_modules": 3,
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         "c_uns": 100.0,
 
         # topologia speciale
-        "num_Nw": 1,      # n. nodes for module storage/excange
+        "num_Nw": 9,      # n. nodes for module storage/excange
         "depot": 0,
     }
 
