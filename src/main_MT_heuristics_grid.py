@@ -1,5 +1,5 @@
 from utils.runs_fun import *
-from utils.runs_heu_random_bis_fun import *
+from utils.runs_heu_random_fun import *
 
 import random, numpy as np, pandas as pd
 from pathlib import Path
@@ -35,7 +35,7 @@ CPLEX_CFG_LOW_PRECISION = {
 
 
 #### GLOBAL PARAMETERS
-RUN_EXACT = False
+RUN_EXACT = True
 RUN_HEUR  = True
 WARM_START = True
 
@@ -55,21 +55,21 @@ if __name__ == "__main__":
     inst_params = {
         # struttura rete
         "number": 3,    # side gridmber,
-        "horizon": 90,
+        "horizon": 60,
         "dt": 5,
         "mean_edge_length_km": 3.33,
         "mean_speed_kmh": 40,
         "rel_std": 0.66,      # std for arch length
 
         # domanda
-        "num_requests": 50,
+        "num_requests": 10,
         "q_min": 1,
         "q_max": 10,
         "slack_min": 20.0,
         "alpha":  0.65,     # parameter for the distribution of the demand
 
         # flotta / capacità
-        "num_modules": 10,
+        "num_modules": 3,
         "num_trails": 6,
         "Q": 10,
         "z_max": 3,     # max n. trail for main
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         "c_uns": 100.0,
 
         # topologia speciale
-        "num_Nw": 5,      # n. nodes for module storage/excange
+        "num_Nw": 1,      # n. nodes for module storage/excange
         "depot": 0,
     }
 

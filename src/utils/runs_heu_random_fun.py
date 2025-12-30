@@ -46,12 +46,6 @@ def mini_routing(
     a = var_dicts["a"]
     b = var_dicts["b"]
 
-    # apply mip start (warm start)
-    if mip_start and warm_start_bool:    # If we have a warmup solution and we want to use it
-        n = add_mip_start_by_name(model, mip_start)  
-        #print(n)
-
-
 
     ### BASELINE: 
     sol_base = model.solve(log_output=False)
@@ -75,19 +69,23 @@ def mini_routing(
         if clustered_ids and labels_PD:
             ignored_ks, active_ks = split_ignored_and_active_ks(labels_PD, clustered_ids)
 
-            # Non-served requests
-            n_ign = add_ignored_request_zero_constraints_ab(mdl=model, I=instance,
-                                                a=a, b=b,
-                                                ignored_ks=ignored_ks,
-                                                name="ign"
-                                                )
             # Fixed modules cluster-wise (con introduzione nuova variabile al modello)
             u = add_cluster_same_module_constraints_ab(mdl=model, I=instance, a=a, b=b,
                                                   labels_PD=labels_PD,
                                                   active_ids=active_ks,
                                                   name="cl_mod",
                                                   )
-            
+
+    ### Se si vuole warm start
+    if warm_start_bool and u is not None:
+        start0 = warmstart_one_request_per_cluster(
+            I=instance,
+            labels_PD=labels_PD,
+            active_ids=active_ks,
+            a=a, b=b, u=u,
+            seed=0,
+        )
+        add_mip_start_by_name(model, start0)  
 
     # -------
     # Solve
@@ -219,21 +217,9 @@ def run_heu_model(
         j = 0
         obj_f_best = 1e100    # Best obj.f. up to now
         best_candidate_constraints = None     # Dictionary with old + new constraints     # ROSA + GRIGI
-        
-        ### Soluzione greedy per warmup iniziale
-        if warm_start_bool:
-            greedy_warmup_sol = build_greedy_warmup_sol_unique_modules(
-                instance=I_full,
-                model_name=model_name,
-                base_fixed_constr=fixed_constraints,
-                n_warm=5,
-                seed=seed,
-                cplex_cfg=cplex_cfg,
-            )
-            best_candidate_warmup_sol = greedy_warmup_sol
-        else:
-            best_candidate_warmup_sol = None
+        best_candidate_warmup_sol = None
 
+    
         
         no_improve = 0   # Number of no improvements in f.obj
         patience = 5
@@ -251,13 +237,11 @@ def run_heu_model(
             now = time.time()
             
             ### 4D, CLUSTERING of the remaining requests (dei NERI)
-            p_insodd = 0    # <- temporaneo
-            labels_PD_events =cluster_PD_events_random(
-                events4d = req4d_PD_remaining,
-                n_clusters = n_clust,
-                p_noise = p_insodd,
-                seed = seed + j    #cambiare seed per cambiare clustering (cmq riproducibile)
-            ) 
+            labels_PD_events = cluster_PD_events_random(
+                events4d=req4d_PD_remaining,
+                n_clusters=n_clust,
+                seed=seed + j,      #cambiare seed per cambiare clustering (cmq riproducibile)
+            )
             
             ### Verifica clustering già studiato
             sig = tuple(sorted(labels_PD_events.items()))
@@ -268,8 +252,8 @@ def run_heu_model(
             seen_signatures.add(sig_hash)
 
 
-            ### Mini Routing to obtain new candidate cosntraints + obj_f
 
+            ### Mini Routing to obtain new candidate cosntraints + obj_f
             candidate_constraints, candidate_obj_f, candidate_solution = mini_routing(
                 instance=I_full,
                 future_fixed_ids=selected_ids,         # requests that will have fixed constraints in the future

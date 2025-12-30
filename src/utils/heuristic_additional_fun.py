@@ -276,7 +276,8 @@ def build_events_4d_from_req7d(req7d: List[Dict[str, Any]]) -> List[Dict[str, An
 
 
 
-### Per ora RANDOM, in futuro EURISTICA
+### Clusterizzazione random (O e D clsuter diversi)
+"""OLD VERSION"""
 def cluster_PD_events_random(
     events4d: List[dict],
     n_clusters: int,
@@ -315,6 +316,31 @@ def cluster_PD_events_random(
 
 
 
+### Clusterizzazione random (O e D stesso cluster)
+def cluster_PD_events_random(
+    events4d: List[dict],
+    n_clusters: int,
+    seed: int | None = None,
+) -> Dict[tuple[int, str], int]:
+    """
+    Random clustering per richiesta k:
+      - pickup e delivery della stessa richiesta finiscono nello STESSO cluster
+
+    Output:
+      labels[(k,"P")] = c
+      labels[(k,"D")] = c
+    """
+    rng = random.Random(seed)
+    labels: Dict[tuple[int, str], int] = {}
+
+    requests = sorted({int(e["k"]) for e in events4d})
+
+    for k in requests:
+        c = rng.randrange(n_clusters)
+        labels[(k, "P")] = c
+        labels[(k, "D")] = c
+
+    return labels
 
 
 
@@ -760,80 +786,53 @@ def fix_all_requests_except_k_ab(
 
 
 
-
-import random
-### Soluzione greedy => n_main = n_richieste soddisfatte
-def build_greedy_warmup_sol_unique_modules(
-    *,
-    instance,
-    model_name: str,
-    base_fixed_constr=None,      # eventuali fix già decisi (ROSA)
-    n_warm: int = 5,
-    seed: int = 0,
-    cplex_cfg=None,
-) -> dict | None:
-    """
-    Sceglie n_warm richieste a caso e impone che siano servite da moduli diversi.
-    Risolve il modello con tutte le altre richieste spente (a,b=0 e s=0).
-    Ritorna mip_start_by_name (dict var_name->value) oppure None se infeasible.
-    """
+### Soluzione greedy cluster-aware => n_cluster = n_richieste soddisfatte
+def warmstart_one_request_per_cluster(
+    I,
+    labels_PD,          # {(k,"P"/"D"): c}
+    active_ids,         # richieste attive
+    name="cl_mod",
+    seed=0,
+):
     rng = random.Random(seed)
 
-    K = [int(k) for k in instance.K]
-    M = [int(m) for m in instance.M]
-    if len(K) == 0:
-        return None
-    if len(M) == 0:
-        return None
+    M = list(I.M)
+    active = set(int(k) for k in active_ids)
 
-    n_warm = min(n_warm, len(K), len(M))
-    k_sel = rng.sample(K, n_warm)
+    # cluster -> set richieste
+    cl2ks = {}
+    for (k, typ), c in labels_PD.items():
+        k = int(k); c = int(c)
+        if k not in active: 
+            continue
+        cl2ks.setdefault(c, set()).add(k)
 
-    # 1) build base model (con eventuali fix ROSA)
-    base_model, base_var_dicts = build_base_model_with_fixed_constraints(
-        instance=instance,
-        model_name=model_name,
-        fixed_constr=base_fixed_constr,
-        cplex_cfg=cplex_cfg,
-    )
+    clusters = sorted(cl2ks.keys())
+    rng.shuffle(clusters)
 
-    mdl = base_model
-    var_dicts = base_var_dicts
+    # assegna moduli diversi finché possibile
+    mods = M[:]
+    rng.shuffle(mods)
 
-    # 2) spegni tutto tranne k_sel
-    fix_all_requests_except_k_ab(mdl, instance, var_dicts, k_sel, name="warm_only")
+    start = {}
 
-    # 3) imponi che le k_sel siano servite (se s esiste)
-    s = var_dicts.get("s", None)
-    if s is not None:
-        for k in k_sel:
-            mdl.add_constraint(s[k] == 1, ctname=f"warm_s1_k{k}")
+    for idx, c in enumerate(clusters):
+        if not cl2ks[c]:
+            continue
 
-    # 4) impone “modulo diverso per richiesta” usando a (pickup) o b (delivery)
-    #    (questa parte dipende dal tuo modello: uso a come "assegno modulo al pickup")
-    a = var_dicts["a"]
-    for idx, k in enumerate(k_sel):
-        m = M[idx]  # modulo diverso
-        # forza che per quella richiesta esista almeno un t con a[k,t,m]=1
-        # (se DeltaT[k] vuoto -> infeasible)
-        terms = [a[(k, t, m)] for t in instance.DeltaT[k] if (k, t, m) in a]
-        if not terms:
-            return None
-        mdl.add_constraint(mdl.sum(terms) == 1, ctname=f"warm_assignA_k{k}_m{m}")
+        k = rng.choice(list(cl2ks[c]))
+        m = mods[idx % len(mods)]  # diverso finché #clusters <= #mods
 
-        # e vieta gli altri moduli
-        for m2 in M:
-            if m2 == m:
-                continue
-            terms2 = [a[(k, t, m2)] for t in instance.DeltaT[k] if (k, t, m2) in a]
-            if terms2:
-                mdl.add_constraint(mdl.sum(terms2) == 0, ctname=f"warm_noA_k{k}_m{m2}")
+        # u[c,m]=1 e gli altri a 0 (opzionale ma meglio)
+        for mm in M:
+            start[f"u_{name}_{c}_{mm}"] = 1 if mm == m else 0
 
-    # 5) solve veloce
-    sol = mdl.solve(log_output=False)
-    if sol is None:
-        return None
+        # scegli un tempo semplice
+        t0 = min(I.DeltaT[k])
 
-    # 6) estrai mip start by name (riusa la tua funzione)
-    return extract_mip_start_by_name(sol, var_dicts)
+        # attiva pickup e delivery (1 sola scelta) sul modulo m
+        start[f"a_{k}_{t0}_{m}"] = 1
+        start[f"b_{k}_{t0}_{m}"] = 1
+
+    return start
 
