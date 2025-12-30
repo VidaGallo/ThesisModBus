@@ -5,6 +5,7 @@ import random, numpy as np, pandas as pd
 from pathlib import Path
 
 
+
 ### Set seed
 def set_seed(seed: int):
     random.seed(seed)
@@ -22,19 +23,19 @@ CPLEX_CFG_HIGH_PRECISION = {
     "parallel": 0             # 0 auto, 1 opportunistic, 2 deterministic
 }
 CPLEX_CFG_LOW_PRECISION = {
-    "time_limit": 600,        # 10 min max
+    "time_limit": 60.0,        # 30s max
     "mip_gap": 0.5,           # relative MIP gap, 0.5 = 50%
     "abs_mip_gap": 1,         # absolute MIP gap, accetta differenza di ±1
     "threads": 0,             # 0 = all available threads
     "mip_display": 1,         # 0..5 (2 = default)
-    "emphasis_mip": 2,        # 0 balanced, 1 feasibility, 2 optimality, ...
+    "emphasis_mip": 1,        # 0 balanced, 1 feasibility, 2 optimality, ...
     "parallel": 0             # 0 auto, 1 opportunistic, 2 deterministic
 }
 
 
 
 #### GLOBAL PARAMETERS
-RUN_EXACT = True
+RUN_EXACT = False
 RUN_HEUR  = True
 WARM_START = True
 
@@ -54,21 +55,21 @@ if __name__ == "__main__":
     inst_params = {
         # struttura rete
         "number": 3,    # side gridmber,
-        "horizon": 60,
+        "horizon": 90,
         "dt": 5,
         "mean_edge_length_km": 3.33,
         "mean_speed_kmh": 40,
         "rel_std": 0.66,      # std for arch length
 
         # domanda
-        "num_requests": 5,
+        "num_requests": 50,
         "q_min": 1,
         "q_max": 10,
         "slack_min": 20.0,
         "alpha":  0.65,     # parameter for the distribution of the demand
 
         # flotta / capacità
-        "num_modules": 3,
+        "num_modules": 10,
         "num_trails": 6,
         "Q": 10,
         "z_max": 3,     # max n. trail for main
@@ -78,14 +79,14 @@ if __name__ == "__main__":
         "c_uns": 100.0,
 
         # topologia speciale
-        "num_Nw": 2,      # n. nodes for module storage/excange
+        "num_Nw": 5,      # n. nodes for module storage/excange
         "depot": 0,
     }
 
     heu_params = {
-        "n_keep": 4,      # n. nodes that are fixed after each iteration (GRIGI)
-        "it_in": 20,
-        "n_clust": 4,
+        "n_keep": 5,      # n. nodes that are fixed after each iteration (GRIGI)
+        "it_in": 15,
+        "n_clust": 10,
         "warm_start_bool": WARM_START    # Start minirouting with the best solution founded in the inner loop so far   
     }
 

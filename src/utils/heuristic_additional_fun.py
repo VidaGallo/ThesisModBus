@@ -7,7 +7,7 @@ from sklearn.manifold import MDS
 import copy
 import random
 
-from utils.GP_def import *
+from utils.GP_fun import *
 from models.model_MT_w import *
 from utils.cplex_config import *
 
@@ -411,6 +411,7 @@ def split_ignored_and_active_ks(labels_event: dict, cluster_ks):
 ### Fissare a 0 il cluster -1
 def add_ignored_request_zero_constraints_ab(mdl, I, a, b, ignored_ks, name="ign"):
     M = list(I.M)
+    ignored_ks = [int(k) for k in ignored_ks]
     for k in ignored_ks:
         k = int(k)
         for t in I.DeltaT[k]:
@@ -420,7 +421,7 @@ def add_ignored_request_zero_constraints_ab(mdl, I, a, b, ignored_ks, name="ign"
                     mdl.add_constraint(a[key] == 0, ctname=f"{name}_a0_k{k}_t{t}_m{m}")
                 if key in b:
                     mdl.add_constraint(b[key] == 0, ctname=f"{name}_b0_k{k}_t{t}_m{m}")
-    return
+    return len(ignored_ks)
 
 
 

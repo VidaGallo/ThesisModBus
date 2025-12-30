@@ -8,7 +8,7 @@ from models.model_MT_w import *
 
 import time
 import copy
-
+import pandas as pd
 from pathlib import Path
 
 
@@ -25,7 +25,6 @@ def mini_routing(
     warm_start_bool: bool = False,
     mip_start: Optional[Dict[str, float]] = None,   # Partial solution proposal (for warm start)
     infeas_value: float = 1e100,
-    
 ) -> Tuple[Dict[str, Dict[tuple, float]], float, Optional[Dict[str, float]]]:
     """
     Build+solve model with:
@@ -41,7 +40,6 @@ def mini_routing(
     model = base_model.clone()
     var_dicts = map_vars_by_name(model, base_var_dicts)
 
-
     a = var_dicts["a"]
     b = var_dicts["b"]
 
@@ -50,16 +48,6 @@ def mini_routing(
         n = add_mip_start_by_name(model, mip_start)  
         #print(n)
 
-    ### BASELINE: 
-    sol_base = model.solve(log_output=False)
-
-    if sol_base is None:
-        print(" Base model infeasible")
-        obj_base = None
-    else:
-        obj_base = float(sol_base.objective_value)
-        sd = model.solve_details
-        print(f"\n   [BASE] status={sd.status} time={sd.time:.2f} obj={obj_base}")
 
     # -------------------------
     # Apply cluster constraints
@@ -70,7 +58,7 @@ def mini_routing(
             ignored_ks, active_ks = split_ignored_and_active_ks(labels_PD, clustered_ids)
 
             # Non-served requests
-            n_ign = add_ignored_request_zero_constraints_ab(mdl=model, I=instance,
+            add_ignored_request_zero_constraints_ab(mdl=model, I=instance,
                                                 a=a, b=b,
                                                 ignored_ks=ignored_ks,
                                                 name="ign"
@@ -85,16 +73,11 @@ def mini_routing(
     # -------
     # Solve
     # -------
-    ### INTEGER
     sol = model.solve(log_output=False)
     if sol is None:   # Soluzione infeasable
-        print("Clustering integer infeasable")
-        #return fixed_constr, infeas_value, None    
+        return fixed_constr, infeas_value, None    
 
     obj = float(sol.objective_value)
-    sd = model.solve_details
-    print(f"   [MINI MIP] status={sd.status} time={sd.time:.2f} obj={obj}")
-
 
     # ----------------------------------
     # Add NEW constraints for selected k
@@ -198,7 +181,7 @@ def run_heu_model(
         best_candidate_constraints = None     # Dictionary with old + new constraints     # ROSA + GRIGI
         best_candidate_warmup_sol = None
 
-        p_insodd = 0.8   # Theta start for this round of GP
+        p_insodd = 0.9   # Theta start for this round of GP
         diff = p_insodd / max(it_in, 1)
         
         no_improve = 0   # Number of no improvements in f.obj
@@ -214,10 +197,8 @@ def run_heu_model(
         seen_signatures: set[int] = set()    # Hash clustering generati e studiati
         while (j < it_in) and no_improve < patience:
             #print(f"Nel in while j: {j}")
-            now = time.time()
             
             ### 4D, CLUSTERING of the remaining requests (dei NERI)
-            p_insodd = 0    # <- temporaneo
             labels_PD_events =cluster_PD_events_random(
                 events4d = req4d_PD_remaining,
                 n_clusters = n_clust,
@@ -233,6 +214,18 @@ def run_heu_model(
                 j += 1   # j++
                 continue
             seen_signatures.add(sig_hash)
+
+            feats = compute_cluster_features(
+                 events4d=req4d_PD_remaining,
+                 labels_PD=labels_PD_events,
+                 node_xy=node_xy,
+                 swap_nodes=I_full.Nw,   # oppure una tua lista
+            )
+            df = pd.DataFrame.from_dict(feats, orient="index")
+            df.index.name = "cluster_id"
+            df = df.reset_index()
+
+            print(df)
 
 
             ### Mini Routing to obtain new candidate cosntraints + obj_f
@@ -250,7 +243,7 @@ def run_heu_model(
             )
               
 
-            print(f"   Inner while, j={j}, f.obj={candidate_obj_f}, time = {time.time()-now}")
+            print(f"-Inner while, j={j}, f.obj={candidate_obj_f}")
 
             ### Inner while best
             if candidate_obj_f < obj_f_best:   # We have an improvement
@@ -266,7 +259,7 @@ def run_heu_model(
     
 
         stop_in_time =  time.time()
-        print(f"\nEND Inner while, j = {j}, f_obj = {obj_f_best}, time = {stop_in_time - start_in_time}")
+        print(f"END Inner while, j = {j}, f_obj = {obj_f_best}, time = {stop_in_time - start_in_time}")
 
 
         if best_candidate_constraints is None:
@@ -279,7 +272,7 @@ def run_heu_model(
             best_global_warmup_sol = best_candidate_warmup_sol   
 
         i += 1  # i++
-        print(f"Outer while, i={i}, f.obj={obj_f_best}\n")
+        print(f"Outer while, i={i}, f.obj={obj_f_best}")
 
     stop_out_time =  time.time()
     print(f"END Outter while, i = {i}, time = {stop_out_time - start_out_time}")
