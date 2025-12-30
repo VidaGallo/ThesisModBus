@@ -3,6 +3,7 @@ from utils.runs_heu_random_fun import *
 
 import random, numpy as np, pandas as pd
 from pathlib import Path
+import time
 
 
 ### Set seed
@@ -35,7 +36,7 @@ CPLEX_CFG_LOW_PRECISION = {
 
 #### GLOBAL PARAMETERS
 RUN_EXACT = True
-RUN_HEUR  = True
+RUN_HEUR  = False
 WARM_START = True
 
 CPLEX_CFG_EXACT = CPLEX_CFG_HIGH_PRECISION
@@ -50,6 +51,8 @@ if __name__ == "__main__":
 
     ### MODEL NAME
     model_name = "w"      # alternative "w_flow"
+    results_root = Path("results")
+    dataset = "GRID_ASYM"   # oppure quello che usi come nome dataset
 
     inst_params = {
         # struttura rete
@@ -107,7 +110,7 @@ if __name__ == "__main__":
 
 
 
-    instance, network_cont_path, requests_cont_path, network_disc_path, requests_disc_path, t_max = build_instance_and_paths(
+    instance, instance_folder, network_cont_path, requests_cont_path, network_disc_path, requests_disc_path, t_max = build_instance_and_paths(
         inst_params = inst_params,
         seed = seed
     )
@@ -120,18 +123,23 @@ if __name__ == "__main__":
         print("*"*50)
         print("EXACT")
         print("\n")
+
+
         res_exact = run_single_model(
-            instance = instance, 
-            model_name = model_name, 
-            inst_params = inst_params,
-            seed=seed, 
-            exp_id=exp_id,
-            base_output_folder=paths["exact"],
+            instance=instance,
+            model_name=model_name,
+            inst_params=inst_params,
+            seed=seed,
+            results_root=results_root,
+            dataset=dataset,
+            instance_folder=instance_folder,
             cplex_cfg=CPLEX_CFG_EXACT,
         )
         pd.DataFrame([res_exact]).to_csv(paths["summary"]/ "summary_exact.csv", index=False)
         exact_end = time.time()
         exact_time = exact_end - exact_start
+
+
 
 
 
@@ -156,7 +164,7 @@ if __name__ == "__main__":
             base_output_folder=paths["heur"],
             cplex_cfg=CPLEX_CFG_HEURISTIC,
 )
-        pd.DataFrame([res_heu]).to_csv(paths["summary"]/ "summary_heur.csv", index=False)
+        pd.DataFrame([res_heu]).to_csv(paths["summary"]/ "summary_heurristic.csv", index=False)
         heu_end = time.time()
         heu_time = heu_end - heu_start
 

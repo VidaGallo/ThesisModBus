@@ -24,7 +24,7 @@ def build_instance_and_paths(
     t_max = inst_params["horizon"] // inst_params["dt"]
 
     # Generating asym grid
-    network_cont_path, requests_cont_path, network_path, requests_path = generate_all_data_asym(
+    instance_folder, network_cont_path, requests_cont_path, network_path, requests_path = generate_all_data_asym(
         number = inst_params["number"],
         horizon = inst_params["horizon"],
         dt = inst_params["dt"],
@@ -53,7 +53,7 @@ def build_instance_and_paths(
         num_Nw = inst_params["num_Nw"],      # first N by degree
         z_max = inst_params.get("z_max")
     )
-    return instance, network_cont_path, requests_cont_path, network_path, requests_path, t_max
+    return instance, instance_folder, network_cont_path, requests_cont_path, network_path, requests_path, t_max
 
 
 
@@ -91,7 +91,7 @@ def build_instance_and_paths_city(
     t_max = horizon // dt
 
     # Generating network from a city
-    network_cont_path, requests_cont_path, network_path, requests_path = generate_all_data_city(
+    instance_folder, network_cont_path, requests_cont_path, network_path, requests_path = generate_all_data_city(
         city=city,
         subdir=subdir,
         central_suburbs=central_suburbs,
@@ -122,7 +122,7 @@ def build_instance_and_paths_city(
         z_max=z_max
     )
 
-    return instance, network_cont_path, requests_cont_path, network_path, requests_path, t_max
+    return instance, instance_folder, network_cont_path, requests_cont_path, network_path, requests_path, t_max
 
 
 
@@ -137,19 +137,41 @@ def run_single_model(
     model_name: str,
     inst_params: dict,
     seed: int,
-    exp_id: str,
-    base_output_folder,   
+    results_root: Path,
+    dataset: str,
+    instance_folder: Path,
     cplex_cfg: dict | None = None,
-
 ) -> dict:
     """
     Costruisce e risolve UNO dei modelli su una stessa Instance (GRID).
     """
+    ### Parametri specifici per questa run
+    run_params = {
+        "model": model_name,
+        "seed": seed,
+        "num_modules": inst_params["num_modules"],
+        "num_trails": inst_params["num_trails"],
+        "Q": inst_params["Q"],
+        "z_max": inst_params.get("z_max")
+    }
+    run_kind = "exact"
+    results_root = Path("results")
 
-    # Sottocartella specifica per questo modello
-    output_folder = base_output_folder / model_name
-    if not output_folder.exists():
-        output_folder.mkdir(parents=True)
+    ### Lettura istanza
+    instance_hash = read_instance_hash(instance_folder)
+
+    ### Sottocartella specifica per questo run
+    output_folder, run_hash = build_run_folder(
+        results_root=results_root,
+        dataset=dataset,
+        instance_hash=instance_hash,
+        run_kind=run_kind,
+        run_params=run_params,
+    )
+
+    ### Verifica se run già effettuata
+    if can_skip_run(output_folder, run_kind):
+        return load_summary_csv(output_folder, run_kind)
 
     # ----------------
     # Costruzione modello
@@ -176,10 +198,10 @@ def run_single_model(
     total_time = time.perf_counter() - t_start_total
 
     if solution:
-        print(f"[EXP {exp_id} | model={model_name}] Status: {solution.solve_status}")
+        print(f"[model={model_name}] Status: {solution.solve_status}")
         print("Objective:", solution.objective_value)
     else:
-        print(f"[EXP {exp_id} | model={model_name}] No solution found.")
+        print(f"[model={model_name}] No solution found.")
     print("Solve time (sec):", solve_time)
     print("Total time (sec):", total_time)
     print("-" * 77)
@@ -192,7 +214,6 @@ def run_single_model(
     save_cplex_log(model, output_folder)
 
     if solution is not None:
-        save_solution_summary(solution, output_folder)
         try:
             save_solution_variables_flex(
                 solution=solution,
@@ -260,9 +281,14 @@ def run_single_model(
     inst_block["grid_nodes"] = inst_params["number"] ** 2 
 
     result = {
-        "exp_id": exp_id,
         "model_name": model_name,
         "seed": seed,
+
+        ### info run
+        "run_kind": run_kind,
+        "instance_hash": instance_hash,
+        "run_hash": run_hash,
+        "dataset": dataset,
 
         # parametri istanza 
         **inst_block,
@@ -275,7 +301,20 @@ def run_single_model(
         "total_time_sec": total_time,
         "served": served,
         "served_ratio": served_ratio,
+    
     }
+
+    ### Scrivere file meta con info della run
+    write_meta(output_folder, {
+        "dataset": dataset,
+        "instance_hash": instance_hash,
+        "run_kind": run_kind,
+        "run_hash": run_hash,
+        "run_params": run_params,
+    })
+
+    ### Salvataggio results
+    save_summary_csv(result, output_folder, run_kind)
 
     return result
 
@@ -352,7 +391,7 @@ def run_single_model_city(
     save_cplex_log(model, output_folder)
 
     if solution is not None:
-        save_solution_summary(solution, output_folder)
+        #save_solution_summary(solution, output_folder)
         try:
             save_solution_variables_flex(
                 solution=solution,
@@ -373,8 +412,6 @@ def run_single_model_city(
                 kappa=kappa,
             )
         except TypeError:
-            # compatibilità se la versione di save_solution_variables_flex
-            # non supporta ancora D,U,z_main,kappa
             pass
 
     # ----------------

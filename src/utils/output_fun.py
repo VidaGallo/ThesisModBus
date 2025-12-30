@@ -11,37 +11,108 @@ post-processing and reproducibility.
 
 from pathlib import Path
 from docplex.mp.model import Model
+import json, hashlib
+from datetime import datetime
+import pandas as pd
 
 
 
-def build_output_folder(base_dir: str, network_path: str):
-    """
-    Build a structured folder for logs and results:
-
-    Example:
-        base_dir = "results"
-        network_path = "instances/GRID/5x5/network_disc5min.json"
-
-    Result folder:
-        results/GRID/5x5/
-    """
-
-    net = Path(network_path)
-
-    # ex.extract GRID/5x5 from network_path
-    network_dir = net.parent.name      # ex."5x5"
-    network_group = net.parent.parent.name   # ex."GRID"
-
-    folder = Path(base_dir) / network_group / network_dir
-    if not folder.exists():
-        folder.mkdir(parents=True)
-
-    return folder
+RUNNER_VERSION = "v1"     # If there was soemthing modified the hash should change
 
 
+### Funzioni per controllare se la run è già stata fatta e fare hash
+def canonical_dumps(d: dict) -> str:
+    return json.dumps(d, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def make_hash(params: dict, n: int = 12) -> str:
+    s = canonical_dumps(params)
+    return hashlib.sha1(s.encode("utf-8")).hexdigest()[:n]
+
+
+def write_meta(base: Path, meta: dict) -> None:
+    meta = dict(meta)
+    meta["created_at"] = datetime.now().isoformat(timespec="seconds")
+    (base / "meta.json").write_text(json.dumps(meta, indent=2, sort_keys=True), encoding="utf-8")
+
+
+### Lettura summary 
+SUMMARY_FILENAMES = {
+    "exact": "summary_exact.csv",
+    "heuristic": "summary_heuristic.csv",
+    "exact_flow": "summary_exact_flow.csv",          # futuro
+    #...
+}
+def summary_csv_path(run_folder: Path, run_kind: str) -> Path:
+    try:
+        filename = SUMMARY_FILENAMES[run_kind]
+    except KeyError:
+        raise ValueError(
+            f"Unknown run_kind '{run_kind}'. "
+        )
+    return run_folder / filename
+
+
+### Controlalre se si può saltare il run (se il summary ed il file meta esistono già + non sono vuoti)
+def can_skip_run(run_folder: Path, run_kind: str) -> bool:
+    meta_ok = (run_folder / "meta.json").exists()
+    summary_path = summary_csv_path(run_folder, run_kind)
+    if not meta_ok or not summary_path.exists():
+        return False
+    try:
+        df = pd.read_csv(summary_path)
+    except Exception:
+        return False
+
+    # non vuoto: almeno 1 riga e almeno 1 colonna
+    return (not df.empty) and (df.shape[1] > 0)
+
+
+### Lettura della hash dell'istanza
+def read_instance_hash(instance_folder: Path) -> str:
+    meta_path = instance_folder / "meta.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    return str(meta["hash"])
 
 
 
+### Costruzione cartella dove salvare i results
+def build_run_folder(
+    results_root: Path,
+    dataset: str,                 # "GRID_ASYM", "GRID", "CITY"
+    instance_hash: str,
+    run_kind: str,                # "exact" o "heuristic"
+    run_params: dict,             # cose che cambiano il run
+) -> tuple[Path, str]:
+    params = dict(
+        runner_version=RUNNER_VERSION,
+        dataset=dataset,
+        instance_hash=instance_hash,
+        kind=run_kind,
+        run_params=run_params,
+    )
+    run_hash = make_hash(params)
+
+    folder = results_root / dataset / instance_hash / run_kind / run_hash
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder, run_hash
+
+
+### Salvataggio sel summary
+def save_summary_csv(res: dict, run_folder: Path, run_kind: str) -> Path:
+    p = summary_csv_path(run_folder, run_kind)
+    pd.DataFrame([res]).to_csv(p, index=False)
+    return p
+
+### Lettura del summary
+def load_summary_csv(run_folder: Path, run_kind: str) -> dict:
+    p = summary_csv_path(run_folder, run_kind)
+    df = pd.read_csv(p)
+    return df.iloc[0].to_dict()
+
+
+
+### Salvataggio log cplex
 def save_cplex_log(mdl: Model, output_folder: Path):
     """
     Save CPLEX log and LP model file in the given folder.
@@ -61,24 +132,7 @@ def save_cplex_log(mdl: Model, output_folder: Path):
 
 
 
-
-def save_solution_summary(solution, output_folder: Path):
-    """
-    Save basic summary info about the solution.
-    """
-    summary_path = output_folder / "solution_summary.txt"
-    with summary_path.open("w") as f:
-        f.write("==== SOLUTION SUMMARY ====\n")
-        f.write(f"Objective Value: {solution.objective_value}\n")
-        f.write(f"Status: {solution.solve_status}\n")
-        f.write(f"Gap: {solution.solve_details.mip_relative_gap}\n")
-        f.write(f"Time: {solution.solve_details.time}\n")
-    #print(f"[INFO] Summary saved to: {summary_path}")
-
-
-
-
-
+### Salvataggio stato modello
 def save_model_stats(mdl: Model, output_folder: Path):
     """
     Write number of variables, constraints, and other model stats.
@@ -95,25 +149,24 @@ def save_model_stats(mdl: Model, output_folder: Path):
 
 
 
+### Salvataggio delle variabili
 def save_solution_variables_flex(
     solution,
     output_folder: Path,
-    *,
     x=None,
     y=None,
     r=None,
-    w=None,
-    z=None,          # vecchia z (se la usi ancora in altri modelli)
+    w=None,        
     s=None,
     L=None,
     R=None,
     a=None,
     b=None,
-    h=None,         # h può essere (i,j,t) oppure (m,i,j,t)
-    D=None,         # NEW: D[m, i, t]
-    U=None,         # NEW: U[m, i, t]
-    z_main=None,    # NEW: z[m, t]
-    kappa=None,     # NEW: kappa[i, t]
+    h=None,         
+    D=None,         
+    U=None,         
+    z_main=None,  
+    kappa=None, 
     thr: float = 0.5,
 ):
     """
@@ -126,7 +179,6 @@ def save_solution_variables_flex(
         y[(m, i, j, t)]
         r[(k, t, m)]
         w[(k, i, t, m, mp)]
-        z[(k, t, m, i)]           # vecchio modello (linearizzazione)
         s[k]
         L[(k, i, t, m)]
         R[(k, i, t, m)]
@@ -139,6 +191,8 @@ def save_solution_variables_flex(
         z_main[(m, t)]
         kappa[(i, t)]
     """
+    if solution is None:  ### Non c'è niente da salvare
+        return
 
     # -------------------------
     # Create subfolder: variables/
@@ -190,16 +244,6 @@ def save_solution_variables_flex(
                 if val > thr:
                     f.write(f"{k},{i},{t},{m},{mp},{val}\n")
 
-    # -------------------------
-    # Z (vecchia): exchange nodes (linearizzazione r*x sui nodi di scambio)
-    # -------------------------
-    if z is not None:
-        with (var_folder / "z_exchange_nodes.csv").open("w") as f:
-            f.write("k,t,m,i,val\n")
-            for (k, t, m, i), var in z.items():
-                val = solution.get_value(var)
-                if val > thr:
-                    f.write(f"{k},{t},{m},{i},{val}\n")
 
     # -------------------------
     # S: served

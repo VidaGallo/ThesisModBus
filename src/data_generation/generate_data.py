@@ -127,7 +127,7 @@ def generate_all_data(
 
     # Se l'istanza è già stata generata in passato
     if maybe_skip_existing(base):
-        return network_cont, requests_cont, network_disc, requests_disc
+        return base, network_cont, requests_cont, network_disc, requests_disc
 
     
     ### GENERATE CONTINUOUS NETWORK + SAVING
@@ -172,7 +172,7 @@ def generate_all_data(
     write_meta(base, {"hash": h, "params": params})   # Si segna la generazione dell'istanza
 
     # Return paths
-    return network_cont, requests_cont, network_disc, requests_disc
+    return base, network_cont, requests_cont, network_disc, requests_disc
 
 
 
@@ -238,7 +238,7 @@ def generate_all_data_asym(
 
     # Se l'istanza è già stata generata in passato non serve ricrearla
     if maybe_skip_existing(base):
-        return network_cont, requests_cont, network_disc, requests_disc
+        return base, network_cont, requests_cont, network_disc, requests_disc
 
 
     ### GENERATE CONTINUOUS NETWORK + SAVING
@@ -286,7 +286,7 @@ def generate_all_data_asym(
     write_meta(base, {"hash": h, "params": params})   # Si segna la generazione dell'istanza
 
     # Return paths
-    return network_cont, requests_cont, network_disc, requests_disc
+    return base, network_cont, requests_cont, network_disc, requests_disc
 
 
 
@@ -357,7 +357,7 @@ def generate_all_data_city(
 
     # Se l'istanza è già stata generata in passato
     if maybe_skip_existing(base):
-        return network_cont, requests_cont, network_disc, requests_disc
+        return base, network_cont, requests_cont, network_disc, requests_disc
 
 
     ### GENERATE CONTINUOUS NETWORK + SAVING
@@ -402,7 +402,7 @@ def generate_all_data_city(
     write_meta(base, {"hash": h, "params": params})   # Si segna la generazione dell'istanza
 
     # Return paths
-    return network_cont, requests_cont, network_disc, requests_disc
+    return base, network_cont, requests_cont, network_disc, requests_disc
 
 
 

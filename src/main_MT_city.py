@@ -58,10 +58,8 @@ if __name__ == "__main__":
     model_names = ["w"]
 
     all_results = []
-    exp_id = f"{city}_h{horizon}_m{num_modules}_r{num_requests}"
 
     print("\n" + "="*80)
-    print(f"EXPERIMENT {exp_id}")
     print(f"  city        = {city}")
     print(f"  horizon       = {horizon}")
     print(f"  num_modules   = {num_modules}")

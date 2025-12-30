@@ -273,8 +273,33 @@ def run_heu_model(
     # ----------------------------------------------------------
 
     ### Folder for the results
-    output_folder = Path(base_output_folder) / f"{model_name}_HEU"
-    output_folder.mkdir(parents=True, exist_ok=True)
+    run_kind = "heur"
+    run_params = {
+        "model": model_name,
+        "seed": seed,
+        # istanza
+        "num_modules": inst_params["num_modules"],
+        "num_trails": inst_params["num_trails"],
+        "Q": inst_params["Q"],
+        "z_max": inst_params.get("z_max"),
+        # euristica
+        "n_keep": heu_params["n_keep"],
+        "it_in": heu_params["it_in"],
+        "n_clust": heu_params["n_clust"],
+        "warm_start": bool(heu_params["warm_start_bool"]),
+        # randomizzazione clustering (se vuoi riproducibilità)
+        "clust_seed_base": seed,
+    }
+    instance_hash = read_instance_hash(instance_folder)
+
+    output_folder, run_hash = build_run_folder(
+        results_root=results_root,
+        dataset=dataset,
+        instance_hash=instance_hash,
+        run_kind=run_kind,
+        run_params=run_params,
+    )
+
 
     t_start_total = time.perf_counter()
     if model_name == "w":
@@ -331,7 +356,7 @@ def run_heu_model(
     save_cplex_log(model_final, output_folder)
 
     if solution is not None:
-        save_solution_summary(solution, output_folder)
+        #save_solution_summary(solution, output_folder)
         save_solution_variables_flex(
                 solution=solution,
                 output_folder=output_folder,
