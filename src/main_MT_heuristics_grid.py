@@ -1,5 +1,5 @@
 from utils.runs_fun import *
-from utils.runs_heu_random_fun import *
+from utils.runs_heu_random_bis_fun import *
 
 import random, numpy as np, pandas as pd
 from pathlib import Path
@@ -23,7 +23,7 @@ CPLEX_CFG_HIGH_PRECISION = {
     "parallel": 0             # 0 auto, 1 opportunistic, 2 deterministic
 }
 CPLEX_CFG_LOW_PRECISION = {
-    "time_limit": 60.0,        # 30s max
+    "time_limit": 60.0,      # 10min max
     "mip_gap": 0.5,           # relative MIP gap, 0.5 = 50%
     "abs_mip_gap": 1,         # absolute MIP gap, accetta differenza di ±1
     "threads": 0,             # 0 = all available threads
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     heu_params = {
         "n_keep": 5,      # n. nodes that are fixed after each iteration (GRIGI)
         "it_in": 15,
-        "n_clust": 10,
+        "n_clust": 5,
         "warm_start_bool": WARM_START    # Start minirouting with the best solution founded in the inner loop so far   
     }
 
