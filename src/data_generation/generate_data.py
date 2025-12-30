@@ -222,6 +222,7 @@ def generate_all_data_asym(
     h = make_hash(params)
 
     ### BUILD FOLDER
+    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     base = (
         Path("instances")
         / "GRID_ASYM"
@@ -229,6 +230,13 @@ def generate_all_data_asym(
         / f"{h}_seed{seed}_H{horizon}_dt{dt}_K{num_requests}"
     )
     base.mkdir(parents=True, exist_ok=True)
+    time_path = base / "_time.txt"   # Salvataggio tempo generazone
+    if not time_path.exists():
+        now = datetime.now()
+        time_path.write_text(
+            now.strftime("%Y/%m/%d\n%H:%M:%S"),
+            encoding="utf-8"
+        )
 
     network_cont  = base / "network.json"
     requests_cont = base / "requests.json"
@@ -340,13 +348,13 @@ def generate_all_data_city(
         .replace(",","")
         .replace(" ", "_")
     )
-
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     base = (
         Path("instances")
         / "CITY"
         / subdir
         / city_slug
-        / f"{h}_seed{seed}_H{horizon}_dt{dt}_K{num_requests}"
+        / f"{h}_seed{seed}_H{horizon}_dt{dt}_K{num_requests}__{ts}"
     )
     base.mkdir(parents=True, exist_ok=True)
 

@@ -95,6 +95,33 @@ def save_model_stats(mdl: Model, output_folder: Path):
 
 
 
+### Scrittura variaibli nel file
+def _write_var_block(solution, f, name, var_dict, header, thr=0.5):
+    """
+    Write a block like:
+    === x ===
+    m,i,t,val
+    ...
+    """
+    if var_dict is None or len(var_dict) == 0:
+        return
+
+    f.write(f"\n=== {name} ===\n")
+    f.write(header + "\n")
+
+    for key, var in var_dict.items():
+        val = solution.get_value(var)
+        if val is None:
+            continue
+        if val > thr:
+            # key can be tuple or scalar
+            if isinstance(key, tuple):
+                f.write(",".join(map(str, key)) + f",{val}\n")
+            else:
+                f.write(f"{key},{val}\n")
+
+
+### Salvataggio singole variabili
 def save_solution_variables_flex(
     solution,
     output_folder: Path,
@@ -321,3 +348,31 @@ def save_solution_variables_flex(
                 val = solution.get_value(var)
                 if val > thr:
                     f.write(f"{i},{t},{val}\n")
+
+    ### Scrittura variabili in singolo file
+    bundle_path = var_folder / "all_variables.txt"
+    with bundle_path.open("w") as f:
+        # same thresholds as single files
+        _write_var_block(solution, f, "x", x, "m,i,t,val", thr=thr)
+        _write_var_block(solution, f, "y", y, "m,i,j,t,val", thr=thr)
+        _write_var_block(solution, f, "r", r, "k,t,m,val", thr=thr)
+        _write_var_block(solution, f, "w", w, "k,i,t,m,mp,val", thr=thr)
+        _write_var_block(solution, f, "z_old", z, "k,t,m,i,val", thr=thr)
+        _write_var_block(solution, f, "s", s, "k,val", thr=0.0)        # s voglio sempre
+        _write_var_block(solution, f, "L", L, "k,i,t,m,val", thr=thr)
+        _write_var_block(solution, f, "R", R, "k,i,t,m,val", thr=thr)
+        _write_var_block(solution, f, "a", a, "k,t,m,val", thr=thr)
+        _write_var_block(solution, f, "b", b, "k,t,m,val", thr=thr)
+
+        # h: detect key size like you already do
+        if h is not None and len(h) > 0:
+            sample_key = next(iter(h.keys()))
+            if isinstance(sample_key, tuple) and len(sample_key) == 3:
+                _write_var_block(solution, f, "h", h, "i,j,t,val", thr=thr)
+            elif isinstance(sample_key, tuple) and len(sample_key) == 4:
+                _write_var_block(solution, f, "h", h, "m,i,j,t,val", thr=thr)
+
+        _write_var_block(solution, f, "D", D, "m,i,t,val", thr=thr)
+        _write_var_block(solution, f, "U", U, "m,i,t,val", thr=thr)
+        _write_var_block(solution, f, "z_main", z_main, "m,t,val", thr=thr)
+        _write_var_block(solution, f, "kappa", kappa, "i,t,val", thr=thr)
