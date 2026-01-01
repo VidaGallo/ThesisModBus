@@ -51,7 +51,7 @@ def create_decision_variables_w(mdl: Model, I: Instance):
             (k, i, t, m, mp)
             for k in I.K
             for t in I.DeltaT[k]
-            if (t > T[0]) and (t < T[-1])    # no exchanges at the beginning and at the end
+            if t != min(I.DeltaT[k])  # not defined for t_min(k)
             for i in Nw
             for m in M
             for mp in M
@@ -59,6 +59,7 @@ def create_decision_variables_w(mdl: Model, I: Instance):
         ],
         name="w"
     )
+
 
     # s[k]
     s = mdl.binary_var_dict(
@@ -442,40 +443,46 @@ def add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
     # ------------------------------------------------------------------
     # 8) Excange constraints w:
     #    (a) w <= r[k,t-1,m]
+    #    (abis)  w' <= 1- r[k,t-1,m]
     #    (b) w <= x[m,i,t]
     #    (c) w <= x[mp,i,t]
     #    (d) sum_{i,m,mp≠m} w <= 1 
-    #    NO (e) r[k,t,m] <= 1 - sum_{i,mp≠m} w[k,i,t,m,mp]
+    #    MO(e) r[k,t,m] <= 1 - sum_{i,mp≠m} w[k,i,t,m,mp]
     #    NO (f) r[k,t,mp] >= sum_{i,m≠mp} w[k,i,t,m,mp]
     # ------------------------------------------------------------------
 
     # (a), (b), (c): local constraints on each w
     for k in K:
-        for t in DeltaT[k]:
+        times_k = sorted(DeltaT[k])
+        if len(times_k) <= 1:
+            continue
+
+        # mappa: tempo -> tempo precedente nella finestra
+        prev_in_window = {t: t_prev for t_prev, t in zip(times_k[:-1], times_k[1:])}
+
+        for t in times_k[1:]:  # esclude t_min(k)
+            t_prev = prev_in_window[t]
+
             for i in Nw:
                 for m in M:
                     for mp in M:
                         if m == mp:
                             continue
-                        # skip if the key does not exist 
                         if (k, i, t, m, mp) not in w:
                             continue
 
-                        # (a) The swap can occur only if the request was on m at time t-1
-                        prev_t = t - 1
-                        if (k, prev_t, m) in r:
-                            mdl.add_constraint(
-                                w[k, i, t, m, mp] <= r[k, prev_t, m],
-                                ctname=f"swap_only_if_onboard_k{k}_i{i}_t{t}_m{m}_mp{mp}"
-                            )
-                        else:
-                            # se r[k,t-1,m] non esiste, vuol dire "non può essere a bordo" → w<=0
-                            mdl.add_constraint(
-                                w[k, i, t, m, mp] <= 0,
-                                ctname=f"swap_only_if_onboard_k{k}_i{i}_t{t}_m{m}_mp{mp}"
-                            )
+                        # (a) swap solo se la richiesta era su m al tempo precedente nella finestra
+                        mdl.add_constraint(
+                            w[k, i, t, m, mp] <= r[k, t_prev, m],
+                            ctname=f"swap_only_if_onboard_k{k}_i{i}_t{t}_m{m}_mp{mp}"
+                        )
+                        # (abis) il ricevente NON deve già avere k (opzionale)
+                        mdl.add_constraint(
+                            w[k, i, t, m, mp] <= 1 - r[k, t_prev, mp],
+                            ctname=f"swap_receiver_empty_k{k}_i{i}_t{t}_m{m}_mp{mp}"
+                        )
 
-                        # (b)(c) The modules must be at the same node i at time t
+                        # (b)(c) moduli nello stesso nodo i al tempo t
                         mdl.add_constraint(
                             w[k, i, t, m, mp] <= x[m, i, t],
                             ctname=f"swap_same_node1_k{k}_i{i}_t{t}_m{m}_mp{mp}"
@@ -488,7 +495,10 @@ def add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
 
     # (d) At most 1 swap per k,t
     for k in K:
-        for t in DeltaT[k]:  
+        tmin = min(DeltaT[k])
+        for t in DeltaT[k]:
+            if t == tmin:   # non essitono w per t_min
+                continue
             mdl.add_constraint(
                 mdl.sum(
                     w[k, i, t, m, mp]
@@ -499,6 +509,7 @@ def add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
                 ) <= 1,
                 ctname=f"one_swap_k{k}_t{t}"
             )
+
 
 
     # (e) Module m "loses" the request

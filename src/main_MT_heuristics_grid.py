@@ -62,7 +62,7 @@ if __name__ == "__main__":
         "rel_std": 0.66,      # std for arch length
 
         # domanda
-        "num_requests": 10,
+        "num_requests": 3,
         "q_min": 1,
         "q_max": 30,
         "slack_min": 20.0,
