@@ -55,14 +55,14 @@ if __name__ == "__main__":
     inst_params = {
         # struttura rete
         "number": 3,    # side gridmber,
-        "horizon": 60,
+        "horizon": 120,
         "dt": 5,
         "mean_edge_length_km": 3.33,
         "mean_speed_kmh": 40,
         "rel_std": 0.66,      # std for arch length
 
         # domanda
-        "num_requests": 6,
+        "num_requests": 10,
         "q_min": 1,
         "q_max": 30,
         "slack_min": 20.0,
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         "c_uns": 100.0,
 
         # topologia speciale
-        "num_Nw": 9,      # n. nodes for module storage/excange
+        "num_Nw": 1,      # n. nodes for module storage/excange
         "depot": 0,
     }
 

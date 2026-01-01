@@ -32,6 +32,18 @@ CPLEX_CFG_LOW_PRECISION = {
 }
 
 
+### Probabilità per demand generation
+PI_OD = {"PC": 0.35, "CP": 0.30, "CC": 0.20, "PP": 0.15}
+
+PI_L_given_OD = {
+    "PC": {"S": 0.15, "M": 0.45, "L": 0.40},
+    "CP": {"S": 0.15, "M": 0.45, "L": 0.40},
+    "CC": {"S": 0.45, "M": 0.45, "L": 0.1},   
+    "PP": {"S": 0.25, "M": 0.45, "L": 0.30},
+}
+
+
+
 
 #### GLOBAL PARAMETERS
 RUN_EXACT = True
