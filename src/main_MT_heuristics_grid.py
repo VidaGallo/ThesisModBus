@@ -1,5 +1,5 @@
 from utils.runs_fun import *
-from utils.runs_heu_random_fun import *
+from utils.runs_heu_surrogate_fun import *
 
 import random, numpy as np, pandas as pd
 from pathlib import Path
@@ -14,7 +14,7 @@ def set_seed(seed: int):
 
 ### Solver configuration
 CPLEX_CFG_HIGH_PRECISION = {
-    "time_limit": 36_000,     # 1 day max
+    "time_limit": 36_000,     # 1 day max, 36_000
     "mip_gap": 0.1,           # relative MIP gap, 0.1 = 10%
     "abs_mip_gap": 0.1,       # absolute MIP gap, accetta differenza di ±0.1
     "threads": 0,             # 0 = all available threads
@@ -54,23 +54,23 @@ if __name__ == "__main__":
 
     inst_params = {
         # struttura rete
-        "number": 3,    # side gridmber,
+        "number": 5,    # side grid,
         "horizon": 120,
         "dt": 5,
-        "mean_edge_length_km": 3.33,
+        "mean_edge_length_km": 2.0, #3.33
         "mean_speed_kmh": 40,
         "rel_std": 0.66,      # std for arch length
 
         # domanda
-        "num_requests": 3,
+        "num_requests": 20,
         "q_min": 1,
         "q_max": 30,
-        "slack_min": 20.0,
+        "slack_min": 30.0,
         "alpha":  0.123,     # parameter for the distribution of the demand (high => fast exp decay, low => almost uniform)
 
         # flotta / capacità
-        "num_modules": 3,
-        "num_trails": 6,
+        "num_modules": 5,
+        "num_trails": 8,
         "Q": 10,
         "z_max": 3,     # max n. trail for main
 
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         "c_uns": 100.0,
 
         # topologia speciale
-        "num_Nw": 1,      # n. nodes for module storage/excange
+        "num_Nw": 0,      # n. nodes for module storage/excange
         "depot": 0,
     }
 

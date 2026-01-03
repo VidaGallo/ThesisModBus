@@ -185,16 +185,16 @@ def add_taxi_like_constraints_w(mdl, I, x, y, r, w, s, a, b, D, U, z, kappa, h):
             ctname=f"initial_position_at_depot_m{m}"
         )
     
-    # Tutti i moduli TRAIL sono connessi a qualche MAIN al tempo t0:
+    # Tutti i moduli TRAIL sono connessi a qualche MAIN al tempo t0 (partenza dal depot):
     mdl.add_constraint(
-        mdl.sum(z[m, t0] for m in M) + mdl.sum(kappa[i, t0] for i in Nw) == len(P),
+        mdl.sum(z[m, t0] for m in M)  == len(P),    # + mdl.sum(kappa[i, t0] for i in Nw)
         ctname="initial_trail_attached_t0"
     )
-    # Opzionale
-    #mdl.add_constraint(
-    #    mdl.sum(kappa[i, t0] for i in Nw) == 0,
-    #    ctname="initial_trail_stock_zero"
-    #)
+    # Nw vuoti in t0
+    mdl.add_constraint(
+        mdl.sum(kappa[i, t0] for i in Nw) == 0,
+        ctname="initial_trail_stock_zero"
+    )
 
 
     # ------------------------------------------------------------------
