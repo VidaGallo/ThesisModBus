@@ -21,7 +21,10 @@ def build_instance_and_paths(
     Generate the asymmetric GRID network and the requests, then build Instance.
     """
 
-    t_max = inst_params["horizon"] // inst_params["dt"]
+    #t_max = inst_params["horizon"] // inst_params["dt"]
+    import math
+    t_max = math.ceil(inst_params["horizon"] / inst_params["dt"])
+
 
     # Generating asym grid
     network_cont_path, requests_cont_path, network_path, requests_path = generate_all_data_asym(
@@ -88,7 +91,8 @@ def build_instance_and_paths_city(
     Generate the CITY network and the requests, then build Instance.
     """
 
-    t_max = horizon // dt
+    #t_max = horizon // dt
+    t_max = math.ceil(horizon / dt)
 
     # Generating network from a city
     network_cont_path, requests_cont_path, network_path, requests_path = generate_all_data_city(

@@ -56,7 +56,7 @@ if __name__ == "__main__":
         # struttura rete
         "number": 3,    # side grid,
         "horizon": 90,
-        "dt": 5,
+        "dt": 4,    # horizon/dt    
         "mean_edge_length_km": 2.0, #3.33
         "mean_speed_kmh": 40,
         "rel_std": 0.66,      # std for arch length
