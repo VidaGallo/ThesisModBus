@@ -1,5 +1,5 @@
 from utils.runs_fun import *
-from utils.runs_heu_random_fun import *
+from utils.runs_heu_GP_fun import *
 
 import random, numpy as np, pandas as pd
 from pathlib import Path
@@ -11,10 +11,11 @@ def set_seed(seed: int):
     random.seed(seed)
     np.random.seed(seed)
 
+TIME_LIMIT_TOT = 600    # Time limit for both exact and heuristic
 
 ### Solver configuration
 CPLEX_CFG_HIGH_PRECISION = {
-    "time_limit": 36_000,     # 1 day max, 36_000
+    "time_limit": TIME_LIMIT_TOT,     
     "mip_gap": 0.1,           # relative MIP gap, 0.1 = 10%
     "abs_mip_gap": 0.1,       # absolute MIP gap, accetta differenza di ±0.1
     "threads": 0,             # 0 = all available threads
@@ -23,7 +24,7 @@ CPLEX_CFG_HIGH_PRECISION = {
     "parallel": 0             # 0 auto, 1 opportunistic, 2 deterministic
 }
 CPLEX_CFG_LOW_PRECISION = {
-    "time_limit": 60.0,      # 10min max
+    "time_limit": 120.0,      # sec max
     "mip_gap": 0.5,           # relative MIP gap, 0.5 = 50%
     "abs_mip_gap": 1,         # absolute MIP gap, accetta differenza di ±1
     "threads": 0,             # 0 = all available threads
@@ -36,8 +37,7 @@ CPLEX_CFG_LOW_PRECISION = {
 
 #### GLOBAL PARAMETERS
 RUN_EXACT = True
-RUN_HEUR  = False
-WARM_START = True
+RUN_HEUR  = True
 
 CPLEX_CFG_EXACT = CPLEX_CFG_HIGH_PRECISION
 CPLEX_CFG_HEURISTIC = CPLEX_CFG_LOW_PRECISION
@@ -54,23 +54,23 @@ if __name__ == "__main__":
 
     inst_params = {
         # struttura rete
-        "number": 5,    # side grid,
-        "horizon": 120,
+        "number": 3,    # side grid,
+        "horizon": 90,
         "dt": 5,
         "mean_edge_length_km": 2.0, #3.33
         "mean_speed_kmh": 40,
         "rel_std": 0.66,      # std for arch length
 
         # domanda
-        "num_requests": 20,
+        "num_requests": 15,
         "q_min": 1,
         "q_max": 30,
         "slack_min": 30.0,
         "alpha":  0.123,     # parameter for the distribution of the demand (high => fast exp decay, low => almost uniform)
 
         # flotta / capacità
-        "num_modules": 5,
-        "num_trails": 8,
+        "num_modules": 3,
+        "num_trails": 4,
         "Q": 10,
         "z_max": 3,     # max n. trail for main
 
@@ -79,16 +79,17 @@ if __name__ == "__main__":
         "c_uns": 100.0,
 
         # topologia speciale
-        "num_Nw": 0,      # n. nodes for module storage/excange
+        "num_Nw": 4,      # n. nodes for module storage/excange
         "depot": 0,
     }
 
     heu_params = {
-        "n_keep": 5,      # n. nodes that are fixed after each iteration (GRIGI)
-        "it_in": 15,
-        "n_clust": 5,
-        "warm_start_bool": WARM_START    # Start minirouting with the best solution founded in the inner loop so far   
-    }
+        "max_seconds": TIME_LIMIT_TOT,      # Max seconds for whole heuristics 
+        "epsilon": 1.23,                    # Higher epsilone => more exploration 
+        "n_init_GP": 2,                     # Number of initial observations for GP
+        "n_iterations_GP": 3                # Number of observations for GP
+    }                                       # tot GP evaluations = n_init_GP + n_iterations_GP
+
 
 
     exp_id = (
@@ -101,12 +102,10 @@ if __name__ == "__main__":
     paths = {
         "base": base,
         "exact": base / "exact",
-        "heur": base / "heuristic_prob",
+        "GP_Nw_heu": base / "heuristic_GP_Nw",
         "summary": base / "summary",
     }
     for p in paths.values(): p.mkdir(parents=True, exist_ok=True)
-
-
 
     instance, network_cont_path, requests_cont_path, network_disc_path, requests_disc_path, t_max = build_instance_and_paths(
         inst_params = inst_params,
@@ -143,18 +142,14 @@ if __name__ == "__main__":
         print("*"*50)
         print("HEURISTIC")
         print("\n")
-        res_heu = run_heu_model(
+        res_heu = run_GP_Nw_heu_model(
             instance = instance,
             model_name = model_name,
-            network_cont_path = network_cont_path,
-            requests_cont_path = requests_cont_path,
-            network_disc_path = network_disc_path,
-            requests_disc_path = requests_disc_path,
-            inst_params = inst_params,              # instance parameters
-            heu_params = heu_params,    # heuristic parameters
+            inst_params = inst_params,          # instance parameters
+            heu_params = heu_params,            # heuristic parameters
             seed=seed, 
             exp_id=exp_id,
-            base_output_folder=paths["heur"],
+            base_output_folder=paths["GP_Nw_heu"],
             cplex_cfg=CPLEX_CFG_HEURISTIC,
 )
         pd.DataFrame([res_heu]).to_csv(paths["summary"]/ "summary_heur.csv", index=False)
@@ -175,24 +170,20 @@ print("\n")
 print("*"*50)
 print("FINAL COMPARISON (EXACT vs HEURISTIC)")
 
+diff = None
 if RUN_EXACT and RUN_HEUR:
-    print(
-        f"EXACT     | served = {res_exact.get('served')} / {res_exact.get('num_requests')} "
-        f"({100*res_exact.get('served_ratio',0):.1f}%)"
-    )
-    print(
-        f"HEURISTIC | served = {res_heu.get('served')} / {res_heu.get('num_requests')} "
-        f"({100*res_heu.get('served_ratio',0):.1f}%)"
-    )
-    print("\n")
+    totalK = inst_params["num_requests"]
+
+    print(f"EXACT     | served = {res_exact.get('served')} / {totalK} ({100*res_exact.get('served_ratio',0):.1f}%)")
+    print(f"HEURISTIC | served = {res_heu.get('served')} / {totalK} ({100*res_heu.get('served_ratio',0):.1f}%)")
+
     if res_exact.get("objective") is not None and res_heu.get("objective") is not None:
-        gap = ((res_heu["objective"] - res_exact["objective"]) / abs(res_exact["objective"])) * 100.0
-        print(
-            f"EXACT = {res_exact['objective']:.3f}, "
-            f"HEUR = {res_heu['objective']:.3f}"
-        )
-    print(f"RELATIVE GAP (HEUR vs EXACT): {gap:.2f}%")
-    print("\n")
+        diff = ((res_heu["objective"] - res_exact["objective"]) / abs(res_exact["objective"])) * 100.0
+        print(f"EXACT = {res_exact['objective']:.3f}, HEUR = {res_heu['objective']:.3f}")
+        print(f"RELATIVE GAP (HEUR vs EXACT): {diff:.2f}%")
+    else:
+        print("RELATIVE GAP (HEUR vs EXACT): n/a (missing objective)")
+
     dt_abs = abs(heu_time - exact_time)
-    print(f"exact = {exact_time:.2f}s, heuristic = {heu_time:.2f}")
-    print(f"TIME DIFF (HEUR vs EXACT): {dt_abs:.2f}%")
+    print(f"exact = {exact_time:.2f}s, heuristic = {heu_time:.2f}s")
+    print(f"TIME DIFF (HEUR vs EXACT): {dt_abs:.2f}s")
