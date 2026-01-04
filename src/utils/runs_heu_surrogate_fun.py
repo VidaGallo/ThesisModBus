@@ -9,6 +9,318 @@ from models.model_MT_w import *
 import time
 import copy
 from pathlib import Path
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import (
+    RBF,
+    RationalQuadratic,
+    ConstantKernel as C
+)
+
+
+
+
+
+def extract_solution_dict(
+    solution,
+    *,
+    x=None, y=None, r=None, w=None, z=None,
+    s=None, L=None, R=None, a=None, b=None,
+    h=None, D=None, U=None, z_main=None, kappa=None,
+    thr: float = 0.5,
+) -> dict:
+    """
+    Estrae la soluzione come dizionario:
+    sol["x"][(m,i,t)] = 1
+    sol["r"][(k,t,m)] = 1
+    ecc.
+    """
+    sol = {}
+
+    def extract(var_dict, thr_local):
+        if var_dict is None:
+            return None
+        out = {}
+        for key, var in var_dict.items():
+            val = solution.get_value(var)
+            if val is None:
+                continue
+            if val > thr_local:
+                out[key] = val
+        return out
+
+    sol["x"] = extract(x, thr)
+    sol["y"] = extract(y, thr)
+    sol["r"] = extract(r, thr)
+    sol["w"] = extract(w, thr)
+    sol["z_old"] = extract(z, thr)
+    sol["s"] = extract(s, 0.0)      # s always present
+    sol["L"] = extract(L, thr)
+    sol["R"] = extract(R, thr)
+    sol["a"] = extract(a, thr)
+    sol["b"] = extract(b, thr)
+    sol["h"] = extract(h, thr)
+    sol["D"] = extract(D, thr)
+    sol["U"] = extract(U, thr)
+    sol["z_main"] = extract(z_main, thr)
+    sol["kappa"] = extract(kappa, thr)
+
+    # rimuove voci None o vuote
+    sol = {k: v for k, v in sol.items() if v}
+
+    return sol
+
+
+
+### Solution for NO Nw using CPLEX
+def first_solution_initialization_solver(
+    instance_no_Nw: Instance,
+    cplex_cfg: dict | None = None,
+) -> dict:
+    """
+    Risoluzione modello exact
+    """
+
+    # Initialization
+    x = y = r = w = L = R = s = a = b = h = None
+    D = U = z = kappa = None  
+
+    # NO Nw
+    instance_no_Nw.num_Nw = 0
+    instance_no_Nw.__post_init__()   # to recalculate Nw = set()
+    
+    model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_w(instance_no_Nw)
+    configure_cplex(model, cplex_cfg)
+
+    # Solve
+    solution = model.solve(log_output=False)
+    if solution:
+        print(f"[First solution Nw=0 (solver)] Status: {solution.solve_status}")
+        print("Objective:", solution.objective_value)
+    else:
+        print(f"[First solution Nw=0 (solver)] No solution found.")
+        return None, None
+
+
+    # Extract solution
+    sol_dict = extract_solution_dict(
+        solution,
+        x=x, y=y, r=r, w=w, z=z,
+        s=s, a=a, b=b, h=h,
+        D=D, U=U, z_main=z, kappa=kappa,
+        thr=0.5
+    )
+    obj = solution.objective_value
+    return sol_dict, obj
+
+
+
+### Evalute candidate using CPLEX
+def first_solution_initialization_solver(
+    instance_no_Nw: Instance,
+    cplex_cfg: dict | None = None,
+) -> dict:
+    """
+    Risoluzione modello exact
+    """
+    # Initialization
+    x = y = r = w = L = R = s = a = b = h = None
+    D = U = z = kappa = None  
+
+    # NO Nw
+    instance_no_Nw.num_Nw = 0
+    instance_no_Nw.__post_init__()   # to recalculate Nw = set()
+    
+    model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_w(instance_no_Nw)
+    configure_cplex(model, cplex_cfg)
+
+    # Solve
+    solution = model.solve(log_output=False)
+    if solution:
+        print(f"[First solution Nw=0 (solver)] Status: {solution.solve_status}")
+        print("Objective:", solution.objective_value)
+    else:
+        print(f"[First solution Nw=0 (solver)] No solution found.")
+        return None, None
+
+
+    # Extract solution
+    sol_dict = extract_solution_dict(
+        solution,
+        x=x, y=y, r=r, w=w, z=z,
+        s=s, a=a, b=b, h=h,
+        D=D, U=U, z_main=z, kappa=kappa,
+        thr=0.5
+    )
+    obj = solution.objective_value
+    return sol_dict, obj
+
+
+def evaluate_candidate(
+    instance_base,
+    cplex_cfg,
+    is_Nw_used_cand: dict,
+    nw: int,
+    t: int,
+):
+    """
+    Valuta il candidato (nw, t)
+    """
+    # Initialization
+    x = y = r = w = L = R = s = a = b = h = None
+    D = U = z = kappa = None  
+    
+    model, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_w_with_Nw(instance_base, is_Nw_used_cand)
+    configure_cplex(model, cplex_cfg)
+
+    # Solve
+    solution = model.solve(log_output=False)
+    if solution:
+        print(f"   Objective function for {(nw,t)}:", solution.objective_value)
+    else:
+        print(f"   For {(nw,t)} NO solution found.")
+        return None, None
+
+
+    # Extract solution
+    sol_dict = extract_solution_dict(
+        solution,
+        x=x, y=y, r=r, w=w, z=z,
+        s=s, a=a, b=b, h=h,
+        D=D, U=U, z_main=z, kappa=kappa,
+        thr=0.5
+    )
+    obj = solution.objective_value
+    return sol_dict, obj
+
+
+def GP_window_selection(
+    instance_base, 
+    Nw_nodes,
+    dt: int,
+    Tmax: int,
+    time_windows,
+    is_Nw_used: dict,
+    current_solution: dict,
+    value_current_solution: float,
+    epsilon: float,
+    n_iterations: int,
+    n_init:int,    # n° of solutions as initialization for each GP round
+    seed: int,
+    cplex_cfg: dict | None = None
+):
+    """
+    Function that for each Nw selects a t where Nw will be active
+    """
+    new_sol = copy.deepcopy(current_solution)
+    new_obj_val = value_current_solution
+    new_is_Nw_used = copy.deepcopy(is_Nw_used)
+    
+    # For each node Nw we try to insert a new active time
+    rng = random.Random(seed)
+    Nw_nodes_shuffled = list(Nw_nodes)
+    rng.shuffle(Nw_nodes_shuffled)
+    for nw in Nw_nodes_shuffled:
+        candidate_times = [    # [t to try]
+            t for t in time_windows
+            if is_Nw_used[(nw, t)] == 0
+        ]
+        # Model without new time windows for the current nw
+        observed_t = []    # no new time windows observed for the current nw
+        observed_y = []    # obj_value without trying a new time windows
+        observed_sol = []  # solution without trying a new time windows
+
+        ### Initialization (evaluate y for some t)
+        init = rng.sample(candidate_times, k=n_init)     # Sample some candidate
+        for t in init:
+            is_Nw_used_candidate = copy.deepcopy(is_Nw_used)
+            is_Nw_used_candidate[(nw, t)] = 1   # Activate the time windos for (nw,t)
+            sol, obj = evaluate_candidate(
+                instance_base = instance_base,
+                is_Nw_used_cand = is_Nw_used_candidate, 
+                cplex_cfg = cplex_cfg
+            )
+            observed_t.append(t)
+            candidate_times.remove(t)    # remove the tested t
+            observed_y.append(obj)
+            observed_sol.append(sol)
+        
+        ### Loop GP / UCB
+        for it in range(n_iterations):
+            if len(candidate_times) == 0:
+                break
+
+            kernel = C(1.0, (1e-3, 1e3)) * (
+                RBF(length_scale=dt, length_scale_bounds=(dt * 0.1, Tmax)) +
+                RationalQuadratic(length_scale=dt, alpha=1.0)
+            )
+            gp = GaussianProcessRegressor(
+                kernel=kernel,
+                alpha=1e-6,
+                normalize_y=True,
+                n_restarts_optimizer=5
+            )
+
+            # ---- fit  ----
+            X_obs = np.array(observed_t, dtype=float).reshape(-1, 1)    # column vector
+            y_obs = np.array(observed_y, dtype=float)                      
+            gp.fit(X_obs, y_obs)
+
+            # ---- predict on remaining candidates ----
+            X_cand = np.array(candidate_times, dtype=float).reshape(-1, 1)
+            y_mean, y_std = gp.predict(X_cand, return_std=True)
+
+            # ---- MINIMIZATION: use LCB ----
+            lcb = y_mean - epsilon * y_std
+            best_idx = int(np.argmin(lcb))
+            t_next = candidate_times[best_idx]
+
+            # ---- evaluate real candidate ----
+            is_Nw_used_candidate = copy.deepcopy(new_is_Nw_used)
+            is_Nw_used_candidate[(nw, t_next)] = 1
+
+            sol_next, y_next = evaluate_candidate(
+                instance_base=instance_base,
+                is_Nw_used_cand=is_Nw_used_candidate,
+                cplex_cfg=cplex_cfg,
+                nw=nw,
+                t=t_next,
+            )
+            if y_next is None:
+                # remove infeasible / failed candidate and continue
+                candidate_times.pop(best_idx)
+                continue
+
+            print(f"      GP it {it+1}: nw={nw}, t={t_next}, obj={y_next}, LCB={lcb[best_idx]}")
+
+            # ---- update observed dataset ----
+            observed_t.append(t_next)
+            observed_y.append(y_next)
+            observed_sol.append(sol_next)
+
+            # ---- remove used candidate ----
+            candidate_times.pop(best_idx)
+
+        # ----------------------------
+        # FINAL DECISION FOR THIS nw
+        # ----------------------------
+        if len(observed_y) == 0:
+            continue
+
+        best_local_idx = int(np.argmin(observed_y))
+        best_local_t = observed_t[best_local_idx]
+        best_local_obj = observed_y[best_local_idx]
+        best_local_sol = observed_sol[best_local_idx]
+
+        # accept only if improves global
+        if best_local_obj < new_obj_val:
+            new_obj_val = best_local_obj
+            new_sol = best_local_sol
+            new_is_Nw_used[(nw, best_local_t)] = 1
+
+
+
+
+
 
 
 
@@ -16,319 +328,75 @@ from pathlib import Path
 # ======================================================================
 #  RUN HEURISTIC SURROGATE - GRID
 # ======================================================================
-def run_heu_model(
-    instance: Instance,
-    model_name: str,         # 'w'
-    network_cont_path, 
-    requests_cont_path, 
-    network_disc_path, 
-    requests_disc_path,          
-    inst_params: dict,
+def run_main_heuristic(
+    instance: Instance,        
     heu_params:dict,
     seed: int,
-    exp_id: str,
     base_output_folder,   # Folder for results
     cplex_cfg: dict | None = None,
-
-) -> dict:
+):
     """
-    Euristica
+    Meta-heuristic loop semplificato:
+    - inizializza soluzione
+    - chiama GP (per trovare t migliore per Nw)
+    - aggiorna soluzione globale solo se GP restituisce una nuova soluzione valida
     """
-    ### Parametri
-    n_keep = heu_params["n_keep"]    # n. nodes that are fixed after each iteration (GRIGI)
-    it_in =  heu_params["it_in"]
-    n_clust = heu_params["n_clust"]
-    warm_start_bool = heu_params["warm_start_bool"]    # Start minirouting with the best solution founded in the inner loop so far   
 
-    start_heu_time = time.time()
+    Nw_nodes=instance.Nw
+    dt=instance.dt
+    Tmax=instance.t_max
+    time_windows = list(range(1, Tmax + 1))    # {1,2, ..., t_max}
 
-    # Full instance (with original discrete data)
-    I_full = instance
+    max_seconds = heu_params["max_seconds"]    # Max seconds for whole heuristics
+    epsilon = heu_params["epsilon"]            # How much exploration for UCB
+    n_iterations_GP = heu_params["n_iterations_GP"]  # Number of it for GP
+    n_init_GP = heu_params["n_init_GP"]        # Number of solution points to initialize the GP
 
-    ### Working with continuous requests and continuous network
-    # Load original requests and project them in 7D (xo,yo,t0,xd,yd,td,q), all CONTINUOUS TIME
-    G, req_original, req7d, node_xy = build_req7d_from_paths(
-        network_path=network_cont_path,      
-        requests_path=requests_cont_path,  
-    )
-
-
-
-    ### Request to be selected
-    req7d_remaining = copy.deepcopy(req7d)                  # 7D candidati GRIGI
-    req_original_remaining= copy.deepcopy(req_original)    # richieste candidati GRIGI
-    
-    ### Constraints that will be fixed
-    fixed_constraints = {}     # Dictionary of fixed variables     # richieste ROSA
-
-    ### Best global solution (for warm start)
-    best_global_warmup_sol = None   
-    best_global_warmup_obj = 1e100
-
-    ###################
-    ### OUTER WHILE ###
-    ###################
-    start_out_time = time.time()
+    # ----------------------------
+    # Solution initialization
+    # ----------------------------
+    current_sol, current_obj_val = first_solution_initialization_solver(
+            instance_no_Nw = copy.deepcopy(instance),
+            cplex_cfg = cplex_cfg
+            )
+    start_time = time.time()
     i = 0
-    while (len(req_original_remaining) >= n_keep):            # stop if there are not enough requests remaining
-        #print(f"Nel out while i: {i}")
-
-        ### Select k = keep elements 
-        # id GRIGI + id NERI
-        selected_ids, remaining_ids = topk_ids_by_centroid_7d(req7d_remaining, n_keep)   # Selezione richieste GRIGIE 
-        
-
-        ### Remaining requests (NERE)
-        req7d_remaining = pick_by_ids(req7d_remaining, remaining_ids, key="k")       # new req7d_remaining
-        req4d_PD_remaining = build_events_4d_from_req7d(req7d_remaining)      # Separation of PICKUP and DELIVERY
-        req_original_remaining = [r for r in req_original_remaining if int(r["id"]) in remaining_ids]  
-
-            
-
-
-        ######################################
-        ### INNER WHILE - GAUSSIAN PROCESS ###
-        ######################################
-        start_in_time = time.time()
-        j = 0
-        obj_f_best = 1e100    # Best obj.f. up to now
-        best_candidate_constraints = None     # Dictionary with old + new constraints     # ROSA + GRIGI
-        best_candidate_warmup_sol = None
-
-    
-        
-        no_improve = 0   # Number of no improvements in f.obj
-        patience = 5
-
-        ### Creazione del base model con fixed constraints (senza clustering)
-        base_model, base_var_dicts = build_base_model_with_fixed_constraints(
-            instance=I_full,
-            model_name=model_name,
-            fixed_constr=fixed_constraints,
-            cplex_cfg=cplex_cfg,
-        )
-        seen_signatures: set[int] = set()    # Hash clustering generati e studiati
-        while (j < it_in) and no_improve < patience:
-            #print(f"Nel in while j: {j}")
-            now = time.time()
-            
-            ### 4D, CLUSTERING of the remaining requests (dei NERI)
-            labels_PD_events = cluster_PD_events_random(
-                events4d=req4d_PD_remaining,
-                n_clusters=n_clust,
-                seed=seed + j,      #cambiare seed per cambiare clustering (cmq riproducibile)
-            )
-            
-            ### Verifica clustering già studiato
-            sig = tuple(sorted(labels_PD_events.items()))
-            sig_hash = hash(sig)
-            if sig_hash in seen_signatures:   # clustering già studiato
-                j += 1   # j++
-                continue
-            seen_signatures.add(sig_hash)
-
-
-
-            ### Mini Routing to obtain new candidate cosntraints + obj_f
-            candidate_constraints, candidate_obj_f, candidate_solution = mini_routing(
-                instance=I_full,
-                future_fixed_ids=selected_ids,         # requests that will have fixed constraints in the future
-                clustered_ids=remaining_ids,           # ID of the requests that were clsutered
-                fixed_constr=fixed_constraints,        # cosntraints già decise in passato (richieste ROSA)
-                mip_start=best_candidate_warmup_sol,   # best partial solution so far
-                warm_start_bool = warm_start_bool,      # use or not warm start
-                labels_PD=labels_PD_events,            # CLUSTERIZZAZIONE
-                base_model=base_model,                 # base model with FIXED CONSTRAINTS
-                base_var_dicts=base_var_dicts,
-            )
-              
-
-            print(f"   Inner while, j={j}, f.obj={candidate_obj_f}, time = {time.time()-now}")
-
-            ### Inner while best
-            if candidate_obj_f < obj_f_best:   # We have an improvement
-                obj_f_best = candidate_obj_f    # A new better solution
-                best_candidate_constraints = copy.deepcopy(candidate_constraints)    # Save the new better constraints
-                best_candidate_warmup_sol = copy.deepcopy(candidate_solution)    # Solution for warmup
-                no_improve = 0
-            else:
-                no_improve += 1
-                
-            j += 1   # j++
-        
-    
-
-        stop_in_time =  time.time()
-        print(f"\nEND Inner while, j = {j}, f_obj = {obj_f_best}, time = {stop_in_time - start_in_time}")
-
-
-        if best_candidate_constraints is None:
-            best_candidate_constraints = copy.deepcopy(fixed_constraints)
-        fixed_constraints = copy.deepcopy(best_candidate_constraints)     ### Queste constriant saranno fissate in futuro (ROSA)
-        
-        ### Global best (for warm start)
-        if obj_f_best < best_global_warmup_obj:
-            best_global_warmup_obj = obj_f_best
-            best_global_warmup_sol = best_candidate_warmup_sol   
-
-        i += 1  # i++
-        print(f"Outer while, i={i}, f.obj={obj_f_best}\n")
-
-    stop_out_time =  time.time()
-    print(f"END Outter while, i = {i}, time = {stop_out_time - start_out_time}")
-    print("\n")
-
-
-
-    # ----------------------------------------------------------
-    # Solve complete model considering all the fixed constriants
-    # ----------------------------------------------------------
-
-    ### Folder for the results
-    output_folder = Path(base_output_folder) / f"{model_name}_HEU"
-    output_folder.mkdir(parents=True, exist_ok=True)
-
-    t_start_total = time.perf_counter()
-    if model_name == "w":
-        model_final, x, y, r, w, s, a, b, D, U, z, kappa, h = create_MT_model_w(I_full)
-        var_dicts = {
-            "x": x, "y": y,
-            "r": r, "w": w, "s": s,
-            "a": a, "b": b,
-            "D": D, "U": U,
-            "z": z, "kappa": kappa,
-            "h": h,
+    best_obj_val = 1e100
+    best_solution = None
+    running_time = 0.0
+    improvement = True
+    is_Nw_used = {   # When Nw is active (value 1) or inactive (value 0)
+            (nw, t): 0
+            for nw in Nw_nodes
+            for t in time_windows
         }
-        L = R = None
-    else:
-        raise ValueError(f"Unknown model_name: {model_name}")
+    while (running_time < max_seconds) and (improvement):  # Stop se fuori tempo max e non si hanno più miglioramenti
+        print(f"\n   ---ITERAZIONE EURISTICA {i} ---")
 
-    configure_cplex(model_final, cplex_cfg)
+        # ------------------------------------------
+        # GP to activate a time windows for each Nw
+        # ------------------------------------------
+        # New current solutiona + new current objective value + updated Nw list
+        current_sol, current_obj_val, is_Nw_used = GP_window_selection(    
+            Nw_nodes=Nw_nodes,
+            dt=dt,
+            Tmax=Tmax,
+            time_window=time_windows,
+            is_Nw_used=is_Nw_used,
+            current_solution=current_sol,
+            value_current_solution=current_obj_val,
+            epsilon=epsilon,
+            n_iterations=n_iterations_GP,
+            n_init=n_init_GP,
+            seed=seed
+        )
 
-    ### Apply fixed constraints
-    if fixed_constraints:   
-        fix_constraints_ab(model_final, var_dicts, fixed_constraints)
+        if current_obj_val > best_obj_val:
+            best_obj_val = current_obj_val
+            best_solution = current_sol
+        else:  # no improvements
+            improvement = False
+        
+        running_time = time.time() - start_time
 
-    ### Apply warm start
-    if best_global_warmup_sol and warm_start_bool:    # We have a warmup solution and we want to use it
-        n = add_mip_start_by_name(model_final, best_global_warmup_sol)  
-        #print(n)
-
-    ### Solve the full model 
-    t_start_solve = time.perf_counter()
-    solution = model_final.solve(log_output=False)
-    solve_time = time.perf_counter() - t_start_solve
-    total_time = time.perf_counter() - t_start_total
-
-
-    ### Time
-    end_heu_time = time.time()
-    print(f"Tot heuristic time, j = {j}: ", end_heu_time - start_heu_time)  
-
-
-    ### Prints solution
-    if solution:
-        print(f"[EXP {exp_id} | FINAL FULL | model={model_name}] Status: {solution.solve_status}")
-        print("Objective:", solution.objective_value)
-    else:
-        print(f"[EXP {exp_id} | FINAL FULL | model={model_name}] No solution found.")
-    print("Solve time (sec):", solve_time)
-    print("Total time (sec):", total_time)
-    print("-" * 77)
-    print(output_folder)
-
-    
-    ### Saves solution
-    save_model_stats(model_final, output_folder)
-    save_cplex_log(model_final, output_folder)
-
-    if solution is not None:
-        save_solution_summary(solution, output_folder)
-        save_solution_variables_flex(
-                solution=solution,
-                output_folder=output_folder,
-                x=x, y=y, r=r, w=w, s=s,
-                L=L, R=R,
-                a=a, b=b, h=h,
-                D=D, U=U,
-                z_main=z,
-                kappa=kappa,
-            )
-
-
-
-    ### Served requests summary
-    if solution is not None:
-        served_requests = []
-        for k in I_full.K:
-            val = solution.get_value(s[k])
-            if val is not None and val > 0.5:
-                served_requests.append(k)
-
-        served = len(served_requests)
-        total = len(I_full.K)
-        served_ratio = served / total if total > 0 else 0.0
-    else:
-        served_requests = []
-        served = 0
-        total = len(I_full.K)
-        served_ratio = 0.0
-
-    print(f"[FINAL FULL {model_name}] -> served: {served}/{total}  ({served_ratio*100:.1f}%)")
-    print(f"[FINAL FULL {model_name}] -> richieste servite (k): {served_requests}")
-
-
-    ### Solver info
-    if solution is not None:
-        status = str(solution.solve_status)
-        objective = float(solution.objective_value)
-        try:
-            mip_gap = model_final.solve_details.mip_relative_gap
-        except Exception:
-            mip_gap = None
-    else:
-        status = "NoSolution"
-        objective = None
-        mip_gap = None
-
-
-    ### Results
-    inst_block = dict(inst_params)
-    inst_block["grid_nodes"] = inst_params["number"] ** 2
-
-    result = {
-        "exp_id": exp_id,
-        "model_name": f"{model_name}_HEU_FINAL_FULL",
-        "seed": seed,
-
-        # parametri istanza
-        **inst_block,
-
-        # parametri euristica (se li vuoi nel CSV)
-        "heu_n_keep": heu_params["n_keep"],
-        "heu_it_in": heu_params["it_in"],
-        "heu_n_clust": heu_params["n_clust"],
-        "heu_warm_start": bool(heu_params["warm_start_bool"]),
-
-        # risultati modello finale
-        "status": status,
-        "objective": objective,
-        "mip_gap": mip_gap,
-        "solve_time_sec": solve_time,
-        "total_time_sec": total_time,
-        "served": served,
-        "served_ratio": served_ratio,
-
-        # tempo totale euristica (utile)
-        "heu_total_time_sec": end_heu_time - start_heu_time,
-
-        # output folder/path (minimo indispensabile)
-        "output_folder": str(output_folder),
-        "network_path": str(network_disc_path),
-        "requests_path": str(requests_disc_path),
-    }
-
-    return result
-
-
-
+    return ...

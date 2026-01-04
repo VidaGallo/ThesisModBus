@@ -23,7 +23,7 @@ CPLEX_CFG_HIGH_PRECISION = {
     "parallel": 0             # 0 auto, 1 opportunistic, 2 deterministic
 }
 CPLEX_CFG_LOW_PRECISION = {
-    "time_limit": 60.0,      # 10min max
+    "time_limit": 300.0,      # 10min max
     "mip_gap": 0.5,           # relative MIP gap, 0.5 = 50%
     "abs_mip_gap": 1,         # absolute MIP gap, accetta differenza di ±1
     "threads": 0,             # 0 = all available threads
@@ -143,7 +143,7 @@ if __name__ == "__main__":
         print("*"*50)
         print("HEURISTIC")
         print("\n")
-        res_heu = run_heu_model(
+        res_heu = run_main_heuristic(
             instance = instance,
             model_name = model_name,
             network_cont_path = network_cont_path,
